@@ -1,0 +1,13 @@
+{
+    "name": "campus-ops-admin",
+    "version": "1.0.0",
+    "description": "CampusOps Admin Panel",
+    "scripts": {
+        "start": "echo \"Use 'npm run dev' to start the client\"",
+        "dev": "cd client && npm run dev",
+        "build": "cd client && npm run build"
+    },
+    "dependencies": {
+        "concurrently": "^8.2.2"
+    }
+}
