@@ -1,6 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { io } from 'socket.io-client';
 import { useAuth } from '../context/AuthContext';
+import { useConfirm } from '../context/ConfirmContext';
+import { getOverallHistoryAPI } from '../utils/api';
 import {
     LayoutDashboard,
     Users,
@@ -14,16 +17,27 @@ import {
     X,
     Bell,
     MessageSquare,
-    Send,
-    User
+    Send
 } from 'lucide-react';
+
+const SOCKET_URL = 'http://localhost:5000';
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
     const { logout } = useAuth();
+    const { confirm } = useConfirm();
     const navigate = useNavigate();
     const location = useLocation();
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
+        const isConfirmed = await confirm({
+            title: 'Confirm Logout',
+            message: 'Are you sure you want to end your session?',
+            variant: 'standard',
+            confirmText: 'Yes, Sign Out'
+        });
+
+        if (!isConfirmed) return;
+
         logout();
         navigate('/login');
     };
@@ -34,7 +48,9 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
         { name: 'Tasks', path: '/tasks', icon: CheckSquare },
         { name: 'Meetings', path: '/meetings', icon: CalendarDays },
         { name: 'Schedule', path: '/schedule', icon: Clock },
+        { name: 'Chat', path: '/chat', icon: MessageSquare },
         { name: 'Reports', path: '/reports', icon: FileText },
+        { name: 'Notifications', path: '/notifications', icon: Bell },
         { name: 'Settings', path: '/settings', icon: Settings },
     ];
 
@@ -47,15 +63,20 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
                 </button>
             </div>
 
-            <nav className="flex-1 px-4 py-6 space-y-2">
+            <nav className="flex-1 px-4 py-8 space-y-1.5 overflow-y-auto custom-scrollbar">
                 {navItems.map((item) => (
                     <NavLink
                         key={item.name}
                         to={item.path}
-                        className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${isActive ? 'bg-primary-600 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
+                        className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200 group ${isActive ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'}`}
                     >
-                        <item.icon size={20} />
-                        <span className="font-medium">{item.name}</span>
+                        {({ isActive }) => (
+                            <>
+                                <item.icon size={20} className="group-hover:scale-110 transition-transform" />
+                                <span className="font-semibold text-sm tracking-tight">{item.name}</span>
+                                {isActive && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-white animate-pulse" />}
+                            </>
+                        )}
                     </NavLink>
                 ))}
             </nav>
@@ -71,30 +92,82 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
 };
 
 const Header = ({ toggleSidebar, user }) => {
+    const navigate = useNavigate();
     const [activePopover, setActivePopover] = useState(null); // 'notifications', 'chat', or null
-    const [chatTab, setChatTab] = useState('overall'); // 'overall' or 'personal'
     const popoverRef = useRef(null);
+    // Live Overall Chat Data
+    const [messages, setMessages] = useState([]);
+    const [connected, setConnected] = useState(false);
+    const socketRef = useRef(null);
 
-    // Mock Chat Data
-    const [messages, setMessages] = useState({
-        overall: [
-            { id: 1, sender: 'Admin', text: 'Welcome to the new semester! 🎓', time: '10:00 AM' },
-            { id: 2, sender: 'System', text: 'Server maintenance scheduled for tonight.', time: '11:30 AM' },
-        ],
-        personal: [
-            { id: 1, sender: 'Dr. Smith', text: 'Can we reschedule the meeting?', time: '09:15 AM', unread: true },
-            { id: 2, sender: 'Dean', text: 'Please review the attached report.', time: 'Yesterday', unread: false },
-        ]
-    });
+    // Socket Connection Setup
+    useEffect(() => {
+        if (!user?.token) return;
+
+        const socket = io(SOCKET_URL, {
+            auth: { token: user.token },
+            transports: ['websocket'],
+        });
+        socketRef.current = socket;
+
+        socket.on('connect', () => {
+            setConnected(true);
+            socket.emit('join_room', 'overall');
+        });
+
+        socket.on('disconnect', () => setConnected(false));
+
+        socket.on('receive_message', (msg) => {
+            if (msg.room === 'overall') {
+                setMessages(prev => [...prev, msg]);
+            }
+        });
+
+        // Load History
+        const loadHistory = async () => {
+            try {
+                const { data } = await getOverallHistoryAPI();
+                setMessages(data);
+            } catch (err) { console.error(err); }
+        };
+        loadHistory();
+
+        return () => socket.disconnect();
+    }, [user?.token]);
 
     const [inputText, setInputText] = useState('');
 
-    // Mock Notifications Data
-    const notifications = [
-        { id: 1, title: 'New Task Assigned', desc: 'Review final year projects', time: '2 hrs ago', unread: true },
-        { id: 2, title: 'Meeting Reminder', desc: 'Faculty Board Meeting in 30 mins', time: '5 hrs ago', unread: true },
-        { id: 3, title: 'System Update', desc: 'New version deployed successfully', time: '1 day ago', unread: false },
-    ];
+    // Live Notifications Data
+    const [notifications, setNotifications] = useState([]);
+    const [notifLoading, setNotifLoading] = useState(false);
+
+    useEffect(() => {
+        const fetchNotifs = async () => {
+            if (activePopover === 'notifications') {
+                setNotifLoading(true);
+                try {
+                    const { getNotificationsAPI } = await import('../utils/api');
+                    const { data } = await getNotificationsAPI();
+                    setNotifications(data);
+                } catch (err) {
+                    console.error(err);
+                } finally {
+                    setNotifLoading(false);
+                }
+            }
+        };
+        fetchNotifs();
+    }, [activePopover]);
+
+    const handleMarkAllRead = async () => {
+        try {
+            const { markAllNotificationsReadAPI } = await import('../utils/api');
+            await markAllNotificationsReadAPI();
+            setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+        } catch (err) {
+            console.error(err);
+        }
+    };
 
     // Close popover on outside click
     useEffect(() => {
@@ -109,20 +182,9 @@ const Header = ({ toggleSidebar, user }) => {
 
     const handleSendMessage = (e) => {
         e.preventDefault();
-        if (!inputText.trim()) return;
+        if (!inputText.trim() || !socketRef.current || !connected) return;
 
-        const newMessage = {
-            id: Date.now(),
-            sender: 'You',
-            text: inputText,
-            time: 'Just now',
-            isMe: true
-        };
-
-        setMessages(prev => ({
-            ...prev,
-            [chatTab]: [...prev[chatTab], newMessage]
-        }));
+        socketRef.current.emit('send_message', { room: 'overall', text: inputText.trim() });
         setInputText('');
     };
 
@@ -132,7 +194,10 @@ const Header = ({ toggleSidebar, user }) => {
                 <button onClick={toggleSidebar} className="md:hidden text-gray-500 hover:text-gray-700">
                     <Menu size={24} />
                 </button>
-                <h2 className="text-xl font-semibold text-gray-800 hidden sm:block">Admin Panel</h2>
+                <div className="flex flex-col">
+                    <h2 className="text-lg font-black text-slate-800 tracking-tight leading-none">Campus Panel</h2>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Management Suite</span>
+                </div>
             </div>
 
             <div className="flex items-center gap-4" ref={popoverRef}>
@@ -147,56 +212,46 @@ const Header = ({ toggleSidebar, user }) => {
                     </button>
 
                     {activePopover === 'chat' && (
-                        <div className="absolute right-0 mt-3 w-80 sm:w-96 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-50">
-                            <div className="flex border-b border-gray-100">
-                                <button
-                                    onClick={() => setChatTab('overall')}
-                                    className={`flex-1 py-3 text-sm font-semibold transition-colors ${chatTab === 'overall' ? 'text-primary-600 border-b-2 border-primary-600 bg-primary-50/50' : 'text-gray-500 hover:bg-gray-50'}`}
-                                >
-                                    Overall
-                                </button>
-                                <button
-                                    onClick={() => setChatTab('personal')}
-                                    className={`flex-1 py-3 text-sm font-semibold transition-colors ${chatTab === 'personal' ? 'text-primary-600 border-b-2 border-primary-600 bg-primary-50/50' : 'text-gray-500 hover:bg-gray-50'}`}
-                                >
-                                    Personal
-                                </button>
+                        <div className="absolute right-0 mt-3 w-80 sm:w-96 bg-slate-900 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] border border-slate-800 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-50">
+                            <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-900/50 backdrop-blur-sm">
+                                <h3 className="font-bold text-slate-100">Overall Chat</h3>
+                                <button onClick={() => { setActivePopover(null); navigate('/chat'); }} className="text-xs text-primary-400 hover:text-primary-300 font-bold transition-colors">Open Full View</button>
                             </div>
 
-                            <div className="h-80 overflow-y-auto p-4 space-y-4 bg-gray-50/50">
-                                {messages[chatTab].length === 0 ? (
-                                    <div className="h-full flex flex-col items-center justify-center text-gray-400">
+                            <div className="h-80 overflow-y-auto p-4 space-y-4 bg-slate-950/50 scrollbar-thin scrollbar-thumb-slate-700">
+                                {messages.length === 0 ? (
+                                    <div className="h-full flex flex-col items-center justify-center text-slate-600">
                                         <MessageSquare size={32} className="mb-2 opacity-20" />
-                                        <p className="text-sm">No messages yet</p>
+                                        <p className="text-sm font-medium">No system history yet</p>
                                     </div>
                                 ) : (
-                                    messages[chatTab].map(msg => (
-                                        <div key={msg.id} className={`flex flex-col ${msg.isMe ? 'items-end' : 'items-start'}`}>
-                                            <div className={`max-w-[85%] px-3 py-2 rounded-2xl text-sm shadow-sm ${msg.isMe
-                                                    ? 'bg-primary-600 text-white rounded-br-none'
-                                                    : 'bg-white border border-gray-100 text-gray-800 rounded-bl-none'
+                                    messages.map((msg, idx) => (
+                                        <div key={msg._id || idx} className={`flex flex-col ${msg.sender?.toString() === user?._id ? 'items-end' : 'items-start'}`}>
+                                            <div className={`max-w-[85%] px-3.5 py-2 rounded-2xl text-sm shadow-sm transition-all ${msg.sender?.toString() === user?._id
+                                                ? 'bg-blue-600 text-white rounded-br-none'
+                                                : 'bg-slate-800 border border-slate-700 text-slate-200 rounded-bl-none'
                                                 }`}>
                                                 {msg.text}
                                             </div>
-                                            <div className="flex items-center gap-1 mt-1 text-[10px] text-gray-400">
-                                                {!msg.isMe && <span className="font-medium">{msg.sender} •</span>}
-                                                <span>{msg.time}</span>
+                                            <div className="flex items-center gap-1 mt-1 text-[10px] text-slate-500 px-1">
+                                                <span className="font-bold uppercase tracking-wider">{msg.sender?.toString() === user?._id ? 'You' : msg.senderName}</span>
+                                                <span className="opacity-50">• {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                             </div>
                                         </div>
                                     ))
                                 )}
                             </div>
 
-                            <form onSubmit={handleSendMessage} className="p-3 bg-white border-t border-gray-100 flex gap-2">
+                            <form onSubmit={handleSendMessage} className="p-4 bg-slate-900 border-t border-slate-800 flex gap-2">
                                 <input
                                     type="text"
-                                    placeholder={`Message ${chatTab}...`}
-                                    className="flex-1 text-sm px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white transition-all"
+                                    placeholder="Type a message..."
+                                    className="flex-1 text-sm px-4 py-2.5 bg-slate-800 border-none rounded-xl text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-all shadow-inner"
                                     value={inputText}
                                     onChange={(e) => setInputText(e.target.value)}
                                 />
-                                <button type="submit" className="p-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors shadow-md shadow-slate-200">
-                                    <Send size={16} />
+                                <button type="submit" className="p-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-500 transition-all shadow-lg active:scale-95 disabled:opacity-50" disabled={!inputText.trim()}>
+                                    <Send size={18} />
                                 </button>
                             </form>
                         </div>
@@ -210,34 +265,53 @@ const Header = ({ toggleSidebar, user }) => {
                         className={`relative p-2 rounded-lg transition-colors ${activePopover === 'notifications' ? 'bg-primary-50 text-primary-600' : 'text-gray-500 hover:text-primary-600 hover:bg-gray-50'}`}
                     >
                         <Bell size={20} />
-                        <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+                        {notifications.some(n => !n.isRead) && (
+                            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border border-white"></span>
+                        )}
                     </button>
 
                     {activePopover === 'notifications' && (
                         <div className="absolute right-0 mt-3 w-80 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-50">
                             <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
                                 <h3 className="font-bold text-gray-800">Notifications</h3>
-                                <button className="text-xs text-primary-600 hover:text-primary-700 font-medium">Mark all read</button>
+                                <button
+                                    onClick={handleMarkAllRead}
+                                    className="text-xs text-primary-600 hover:text-primary-700 font-medium disabled:opacity-50"
+                                    disabled={!notifications.some(n => !n.isRead)}
+                                >
+                                    Mark all read
+                                </button>
                             </div>
                             <div className="max-h-80 overflow-y-auto">
-                                {notifications.map(notif => (
-                                    <div key={notif.id} className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer ${notif.unread ? 'bg-blue-50/30' : ''}`}>
-                                        <div className="flex gap-3">
-                                            <div className="mt-1 min-w-[32px] h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600">
-                                                <Bell size={14} />
+                                {notifLoading ? (
+                                    <div className="p-8 text-center text-xs text-slate-400">Loading alerts...</div>
+                                ) : notifications.length === 0 ? (
+                                    <div className="p-8 text-center text-xs text-slate-400">No new alerts</div>
+                                ) : (
+                                    notifications.map(notif => (
+                                        <div key={notif._id} className={`p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer ${notif.isRead ? 'opacity-60' : 'bg-blue-50/30'}`}>
+                                            <div className="flex gap-3">
+                                                <div className={`mt-1 min-w-[32px] h-8 rounded-full flex items-center justify-center ${notif.type === 'task' ? 'bg-emerald-100 text-emerald-600' : notif.type === 'meeting' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-600'}`}>
+                                                    <Bell size={14} />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className="flex items-center justify-between">
+                                                        <h4 className="text-sm font-bold text-gray-900">{notif.title}</h4>
+                                                        {!notif.isRead && <span className="w-1.5 h-1.5 bg-blue-600 rounded-full"></span>}
+                                                    </div>
+                                                    <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{notif.message}</p>
+                                                    <div className="flex items-center justify-between mt-1">
+                                                        <span className="text-[10px] text-gray-400">{new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                        <span className="text-[10px] font-bold text-slate-300 uppercase tracking-tighter">{notif.faculty?.name.split(' ')[0]}</span>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <h4 className={`text-sm ${notif.unread ? 'font-bold text-gray-900' : 'font-medium text-gray-700'}`}>{notif.title}</h4>
-                                                <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{notif.desc}</p>
-                                                <span className="text-[10px] text-gray-400 mt-1 block">{notif.time}</span>
-                                            </div>
-                                            {notif.unread && <div className="mt-2 w-2 h-2 bg-blue-500 rounded-full shrink-0"></div>}
                                         </div>
-                                    </div>
-                                ))}
+                                    ))
+                                )}
                             </div>
                             <div className="p-3 text-center border-t border-gray-100 bg-gray-50/50">
-                                <button className="text-xs font-semibold text-gray-500 hover:text-gray-800">View All Notifications</button>
+                                <button onClick={() => { setActivePopover(null); navigate('/notifications'); }} className="text-xs font-semibold text-primary-600 hover:text-primary-800">View Audit Log</button>
                             </div>
                         </div>
                     )}
@@ -255,13 +329,15 @@ const Header = ({ toggleSidebar, user }) => {
                     </div>
                 </div>
             </div>
-        </header>
+        </header >
     )
 }
 
 const Layout = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const { user } = useAuth();
+    const location = useLocation();
+    const isChat = location.pathname === '/chat';
 
     return (
         <div className="flex h-screen bg-gray-50 overflow-hidden">
@@ -270,7 +346,7 @@ const Layout = () => {
             <div className="flex-1 flex flex-col overflow-hidden">
                 <Header toggleSidebar={() => setSidebarOpen(!sidebarOpen)} user={user} />
 
-                <main className="flex-1 overflow-y-auto p-6 scroll-smooth">
+                <main className={`flex-1 overflow-hidden ${isChat ? '' : 'overflow-y-auto p-6 scroll-smooth'}`}>
                     <Outlet />
                 </main>
             </div>

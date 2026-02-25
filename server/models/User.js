@@ -17,8 +17,11 @@ const userSchema = mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['admin', 'faculty'], // In future faculty might log in? For now Admin only.
-        default: 'admin',
+        enum: ['admin', 'faculty', 'hod'],
+        default: 'faculty',
+    },
+    department: {
+        type: String, // Department ID/Code (e.g., 'CS', 'ME') - primarily for HODs
     },
 }, {
     timestamps: true,

@@ -13,6 +13,11 @@ const taskSchema = mongoose.Schema({
         enum: ['Assigned', 'Accepted', 'In Progress', 'Completed', 'Verified'],
         default: 'Assigned',
     },
+    priority: {
+        type: String,
+        enum: ['Low', 'Medium', 'High'],
+        default: 'Medium',
+    },
     dueDate: { type: Date },
     isOverdue: { type: Boolean, default: false },
 }, {

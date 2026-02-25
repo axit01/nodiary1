@@ -35,4 +35,20 @@ const admin = (req, res, next) => {
     }
 };
 
-module.exports = { protect, admin };
+const hod = (req, res, next) => {
+    if (req.user && (req.user.role === 'hod' || req.user.role === 'admin')) {
+        next();
+    } else {
+        res.status(401).json({ message: 'Not authorized as an HOD or Admin' });
+    }
+};
+
+const adminOrHod = (req, res, next) => {
+    if (req.user && (req.user.role === 'admin' || req.user.role === 'hod')) {
+        next();
+    } else {
+        res.status(401).json({ message: 'Not authorized as an Admin or HOD' });
+    }
+};
+
+module.exports = { protect, admin, hod, adminOrHod };

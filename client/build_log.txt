@@ -1,0 +1,16 @@
+
+> client@0.0.0 build
+> vite build
+
+file:///C:/Users/axitk/OneDrive/Desktop/Projects/2.%20No%20Diary/client/node_modules/vite/dist/node/chunks/config.js:1
+# Final CampusOps Database Schema (Unified)
+^
+
+SyntaxError: Invalid or unexpected token
+    at compileSourceTextModule (node:internal/modules/esm/utils:346:16)
+    at ModuleLoader.moduleStrategy (node:internal/modules/esm/translators:107:18)
+    at #translate (node:internal/modules/esm/loader:540:12)
+    at ModuleLoader.loadAndTranslate (node:internal/modules/esm/loader:587:27)
+    at async ModuleJob._link (node:internal/modules/esm/module_job:162:19)
+
+Node.js v22.19.0

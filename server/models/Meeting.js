@@ -6,6 +6,7 @@ const meetingSchema = mongoose.Schema({
     date: { type: Date, required: true },
     startTime: { type: String, required: true }, // '14:00'
     endTime: { type: String, required: true },
+    location: { type: String },
     participants: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Faculty',

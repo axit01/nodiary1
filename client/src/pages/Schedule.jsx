@@ -1,232 +1,345 @@
-import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Filter, X, Edit2 } from 'lucide-react';
-import { timeSlots, classes, getInitialScheduleItem } from '../utils/scheduleUtils';
+import { useState, useEffect, useCallback } from 'react';
+import { ChevronLeft, ChevronRight, Filter, X, Edit2, Plus, Loader2, Trash2 } from 'lucide-react';
+import { timeSlots, timeSlotLabels } from '../utils/scheduleUtils';
+import {
+    getTimetableAPI,
+    addTimetableSlotAPI,
+    updateTimetableSlotAPI,
+    deleteTimetableSlotAPI,
+    getFacultyAPI
+} from '../utils/api';
+import { useToast } from '../context/ToastContext';
+import { useConfirm } from '../context/ConfirmContext';
+
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 const Schedule = () => {
-    const [selectedDepartment, setSelectedDepartment] = useState('All');
+    const { showToast } = useToast();
+    const { confirm } = useConfirm();
+    const [timetable, setTimetable] = useState([]);
+    const [faculty, setFaculty] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+
+    const [selectedDay, setSelectedDay] = useState(DAYS[new Date().getDay() - 1] || 'Monday');
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedCell, setSelectedCell] = useState(null);
+    const [selectedSlot, setSelectedSlot] = useState(null);
+    const [formSubmitting, setFormSubmitting] = useState(false);
 
-    // Date Stats
-    const [currentDate, setCurrentDate] = useState(new Date('2026-01-16'));
+    const [formData, setFormData] = useState({
+        faculty: '',
+        subject: '',
+        room: '',
+        day: '',
+        startTime: '09:00',
+        endTime: '10:00',
+        classSection: ''
+    });
 
+    // Load data
+    const loadData = useCallback(async () => {
+        try {
+            setLoading(true);
+            const [ttRes, facRes] = await Promise.all([
+                getTimetableAPI(),
+                getFacultyAPI()
+            ]);
+            setTimetable(ttRes.data);
+            setFaculty(facRes.data);
+        } catch (err) {
+            setError('Failed to load schedule data.');
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
 
+    useEffect(() => {
+        loadData();
+    }, [loadData]);
 
-    const departments = ['All', 'Computer Science', 'Mechanical', 'Electrical', 'Civil'];
-
-    // Local State for Custom Overrides (Mocking Database)
-    const [scheduleOverrides, setScheduleOverrides] = useState({});
-
-    const filteredClasses = selectedDepartment === 'All'
-        ? classes
-        : classes.filter(c => c.dept === selectedDepartment);
-
-
-
-    const getScheduleItem = (classId, timeIdx) => {
-        const key = `${classId}-${timeIdx}`;
-        if (scheduleOverrides[key] !== undefined) return scheduleOverrides[key];
-        return getInitialScheduleItem(classId, timeIdx);
+    const handleOpenAddModal = (classSection, time) => {
+        setFormData({
+            faculty: '',
+            subject: '',
+            room: '',
+            day: selectedDay,
+            startTime: time || '09:00',
+            endTime: (time ? `${parseInt(time) + 1}:00`.padStart(5, '0') : '10:00'),
+            classSection: classSection || ''
+        });
+        setSelectedSlot(null);
+        setIsModalOpen(true);
     };
 
-    const handleCellClick = (classId, timeIdx, currentData) => {
-        setSelectedCell({
-            classId,
-            timeIdx,
-            title: classes.find(c => c.id === classId).name,
-            timeLabel: timeSlots[timeIdx],
-            data: currentData || { subject: '', room: '', type: 'Lecture', faculty: '' }
+    const handleOpenEditModal = (slot) => {
+        setSelectedSlot(slot);
+        setFormData({
+            faculty: slot.faculty._id,
+            subject: slot.subject,
+            room: slot.room,
+            day: slot.day,
+            startTime: slot.startTime,
+            endTime: slot.endTime,
+            classSection: slot.classSection
         });
         setIsModalOpen(true);
     };
 
-    const handleCellSave = (newData) => {
-        const key = `${selectedCell.classId}-${selectedCell.timeIdx}`;
-        setScheduleOverrides(prev => ({
-            ...prev,
-            [key]: newData.subject ? newData : null // If subject empty, clear slot
-        }));
-        setIsModalOpen(false);
+    const handleSave = async (e) => {
+        e.preventDefault();
+        setFormSubmitting(true);
+        try {
+            if (selectedSlot) {
+                await updateTimetableSlotAPI(selectedSlot._id, formData);
+            } else {
+                await addTimetableSlotAPI(formData);
+            }
+            await loadData();
+            setIsModalOpen(false);
+            showToast('Slot saved successfully', 'success');
+        } catch (err) {
+            showToast(err.response?.data?.message || 'Failed to save slot', 'error');
+        } finally {
+            setFormSubmitting(false);
+        }
     };
 
-    const handleDateChange = (days) => {
-        const newDate = new Date(currentDate);
-        newDate.setDate(newDate.getDate() + days);
-        setCurrentDate(newDate);
-        // In a real app, this would trigger a refetch
+    const handleDelete = async (id) => {
+        const isConfirmed = await confirm({
+            title: 'Delete Schedule Slot?',
+            message: 'Are you sure you want to remove this class slot from the timetable?',
+            variant: 'danger',
+            confirmText: 'Yes, Delete Slot'
+        });
+
+        if (!isConfirmed) return;
+
+        try {
+            await deleteTimetableSlotAPI(id);
+            await loadData();
+            setIsModalOpen(false);
+            showToast('Slot deleted successfully', 'success');
+        } catch (err) {
+            showToast('Failed to delete slot', 'error');
+        }
     };
+
+    // Filter timetable for current day and organize by section
+    const daySlots = timetable.filter(s => s.day === selectedDay);
+    const sections = [...new Set(daySlots.map(s => s.classSection))].sort();
+
+    // Fallback if no sections exist yet
+    const displaySections = sections.length > 0 ? sections : ['Default Section'];
+
+    const getSlot = (section, time) => {
+        return daySlots.find(s => s.classSection === section && s.startTime === time);
+    };
+
+    if (loading && timetable.length === 0) {
+        return (
+            <div className="h-full flex items-center justify-center">
+                <Loader2 className="animate-spin text-primary-600" size={40} />
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <h1 className="text-2xl font-bold text-gray-800">Class Schedule</h1>
-                <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-                    {/* Department Filter */}
-                    <div className="relative">
-                        <Filter className="absolute left-3 top-2.5 text-gray-400" size={18} />
-                        <select
-                            className="pl-10 pr-8 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 appearance-none bg-white w-full"
-                            value={selectedDepartment}
-                            onChange={(e) => setSelectedDepartment(e.target.value)}
-                        >
-                            {departments.map(dept => (
-                                <option key={dept} value={dept}>{dept}</option>
-                            ))}
-                        </select>
-                    </div>
 
-                    {/* Date Navigation */}
-                    <div className="flex items-center gap-4 bg-white px-4 py-2 rounded-lg shadow-sm border border-gray-200 justify-between sm:justify-start w-full sm:w-auto">
-                        <button onClick={() => handleDateChange(-1)} className="text-gray-500 hover:text-gray-900"><ChevronLeft size={20} /></button>
-                        <span className="font-semibold text-gray-700 whitespace-nowrap">
-                            {currentDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                        </span>
-                        <button onClick={() => handleDateChange(1)} className="text-gray-500 hover:text-gray-900"><ChevronRight size={20} /></button>
-                    </div>
+                <div className="flex items-center gap-4 bg-white px-2 py-1.5 rounded-xl shadow-sm border border-gray-100">
+                    {DAYS.map(day => (
+                        <button
+                            key={day}
+                            onClick={() => setSelectedDay(day)}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${selectedDay === day
+                                ? 'bg-slate-900 text-white shadow-md'
+                                : 'text-gray-500 hover:bg-gray-50'
+                                }`}
+                        >
+                            {day.slice(0, 3)}
+                        </button>
+                    ))}
+                </div>
+
+                <button
+                    onClick={() => handleOpenAddModal()}
+                    className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm"
+                >
+                    <Plus size={18} />
+                    Add Slot
+                </button>
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full border-collapse">
+                        <thead>
+                            <tr>
+                                <th className="p-4 border-b border-r border-gray-100 bg-gray-50/50 text-left text-xs font-bold text-gray-500 uppercase tracking-wider sticky left-0 z-10 w-48">
+                                    Section
+                                </th>
+                                {timeSlots.map((time, idx) => (
+                                    <th key={time} className="p-4 border-b border-gray-100 bg-gray-50/50 text-center text-xs font-bold text-gray-500 uppercase tracking-wider min-w-[160px]">
+                                        {timeSlotLabels[idx]}
+                                    </th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {displaySections.map(section => (
+                                <tr key={section} className="group">
+                                    <td className="p-4 border-b border-r border-gray-100 font-bold text-gray-800 sticky left-0 z-10 bg-white group-hover:bg-gray-50 transition-colors">
+                                        {section}
+                                    </td>
+                                    {timeSlots.map(time => {
+                                        const slot = getSlot(section, time);
+                                        return (
+                                            <td
+                                                key={`${section}-${time}`}
+                                                className="p-3 border-b border-gray-100 h-32 relative group/cell"
+                                            >
+                                                {slot ? (
+                                                    <div
+                                                        onClick={() => handleOpenEditModal(slot)}
+                                                        className="h-full w-full bg-indigo-50 border border-indigo-100 rounded-xl p-3 flex flex-col justify-between cursor-pointer hover:bg-indigo-100 transition-all hover:shadow-sm"
+                                                    >
+                                                        <div>
+                                                            <p className="font-bold text-indigo-900 text-sm line-clamp-1">{slot.subject}</p>
+                                                            <p className="text-xs text-indigo-600 font-medium mt-1">{slot.faculty.name}</p>
+                                                        </div>
+                                                        <div className="flex justify-between items-center mt-2">
+                                                            <span className="text-[10px] font-bold bg-white text-indigo-700 px-2 py-0.5 rounded-full border border-indigo-100 uppercase tracking-wide">
+                                                                {slot.room}
+                                                            </span>
+                                                            <Edit2 size={12} className="text-indigo-400 opacity-0 group-hover/cell:opacity-100 transition-opacity" />
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <button
+                                                        onClick={() => handleOpenAddModal(section, time)}
+                                                        className="w-full h-full rounded-xl border-2 border-dashed border-gray-100 group-hover/cell:border-primary-200 transition-all flex items-center justify-center text-gray-300 group-hover/cell:text-primary-400"
+                                                    >
+                                                        <Plus size={20} />
+                                                    </button>
+                                                )}
+                                            </td>
+                                        );
+                                    })}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[1000px]">
-                    <thead>
-                        <tr>
-                            <th className="p-4 border-b border-r border-gray-200 bg-gray-50 min-w-[180px] sticky left-0 z-10 text-gray-700 font-bold shadow-sm">
-                                Class / Section
-                            </th>
-                            {timeSlots.map(time => (
-                                <th key={time} className="p-4 border-b border-gray-200 bg-gray-50 font-medium text-gray-600 min-w-[140px] text-center">
-                                    {time}
-                                </th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {filteredClasses.map((cls, idx) => (
-                            <tr key={cls.id} className="hover:bg-gray-50/50 transition-colors">
-                                <td className="p-4 border-b border-r border-gray-200 bg-white sticky left-0 z-10 shadow-[4px_0_24px_rgba(0,0,0,0.02)]">
-                                    <div>
-                                        <p className="font-bold text-gray-800">{cls.name}</p>
-                                        <p className="text-xs text-gray-500">{cls.dept}</p>
-                                    </div>
-                                </td>
-                                {timeSlots.map((time, timeIdx) => {
-                                    const session = getScheduleItem(cls.id, timeIdx);
-
-                                    if (!session) {
-                                        return (
-                                            <td
-                                                key={`${cls.id}-${time}`}
-                                                className="p-2 border-b border-gray-100 bg-gray-50/10 cursor-pointer hover:bg-gray-100 transition-colors relative group"
-                                                onClick={() => handleCellClick(cls.id, timeIdx, null)}
-                                            >
-                                                <div className="opacity-0 group-hover:opacity-100 absolute inset-0 flex items-center justify-center text-gray-400">
-                                                    <Edit2 size={16} />
-                                                </div>
-                                            </td>
-                                        );
-                                    }
-
-                                    const isLab = session.type === 'Lab';
-                                    const bgColor = isLab ? 'bg-purple-50 hover:bg-purple-100' : 'bg-blue-50 hover:bg-blue-100';
-                                    const borderColor = isLab ? 'border-purple-200' : 'border-blue-200';
-                                    const textColor = isLab ? 'text-purple-700' : 'text-blue-700';
-
-                                    return (
-                                        <td key={`${cls.id}-${time}`} className="p-2 border-b border-gray-100 h-28 relative">
-                                            <div
-                                                onClick={() => handleCellClick(cls.id, timeIdx, session)}
-                                                className={`h-full w-full ${bgColor} border ${borderColor} rounded-lg p-2.5 flex flex-col justify-between transition-colors cursor-pointer group shadow-sm hover:shadow-md`}
-                                            >
-                                                <div className="flex justify-between items-start">
-                                                    <span className={`font-bold text-sm ${textColor} leading-tight line-clamp-2`}>{session.subject}</span>
-                                                    {isLab && <span className="text-[10px] font-bold bg-purple-200 text-purple-800 px-1.5 py-0.5 rounded">LAB</span>}
-                                                </div>
-                                                <div className="text-xs text-gray-500 flex flex-col gap-0.5 mt-2">
-                                                    <span className="font-medium text-gray-600">{session.room}</span>
-                                                    <span className="text-gray-400 group-hover:text-gray-500 transition-colors truncate">{session.faculty}</span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                    );
-                                })}
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-            </div>
-
-            {/* Edit Modal */}
-            {isModalOpen && selectedCell && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
-                        <div className="flex justify-between items-center p-5 border-b border-gray-100">
+            {/* Timetable Modal */}
+            {isModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="px-8 pt-8 pb-4 flex justify-between items-center">
                             <div>
-                                <h3 className="font-bold text-gray-800 text-lg">{selectedCell.title}</h3>
-                                <p className="text-sm text-gray-500">{selectedCell.timeLabel}</p>
+                                <h2 className="text-2xl font-bold text-gray-900">{selectedSlot ? 'Edit Slot' : 'Add New Slot'}</h2>
+                                <p className="text-sm text-gray-500 mt-1">Fill in the details for this session</p>
                             </div>
-                            <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100">
-                                <X size={20} />
+                            <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400">
+                                <X size={24} />
                             </button>
                         </div>
 
-                        <div className="p-6 space-y-4">
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Subject</label>
-                                <input
-                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none"
-                                    value={selectedCell.data.subject}
-                                    onChange={(e) => setSelectedCell({ ...selectedCell, data: { ...selectedCell.data, subject: e.target.value } })}
-                                    placeholder="e.g. Data Structures"
-                                />
-                            </div>
+                        <form onSubmit={handleSave} className="p-8 space-y-5">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Room</label>
-                                    <input
-                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none"
-                                        value={selectedCell.data.room}
-                                        onChange={(e) => setSelectedCell({ ...selectedCell, data: { ...selectedCell.data, room: e.target.value } })}
-                                        placeholder="LH-101"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Type</label>
+                                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Day</label>
                                     <select
-                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none bg-white"
-                                        value={selectedCell.data.type}
-                                        onChange={(e) => setSelectedCell({ ...selectedCell, data: { ...selectedCell.data, type: e.target.value } })}
+                                        required
+                                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 outline-none appearance-none"
+                                        value={formData.day}
+                                        onChange={e => setFormData({ ...formData, day: e.target.value })}
                                     >
-                                        <option value="Lecture">Lecture</option>
-                                        <option value="Lab">Lab</option>
-                                        <option value="Tutorial">Tutorial</option>
+                                        {DAYS.map(day => <option key={day} value={day}>{day}</option>)}
                                     </select>
                                 </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Section</label>
+                                    <input
+                                        required
+                                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+                                        value={formData.classSection}
+                                        onChange={e => setFormData({ ...formData, classSection: e.target.value })}
+                                        placeholder="e.g. CSE-3A"
+                                    />
+                                </div>
                             </div>
+
                             <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Faculty</label>
+                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Faculty Member</label>
+                                <select
+                                    required
+                                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 outline-none appearance-none"
+                                    value={formData.faculty}
+                                    onChange={e => setFormData({ ...formData, faculty: e.target.value })}
+                                >
+                                    <option value="">Select Faculty</option>
+                                    {faculty.map(f => <option key={f._id} value={f._id}>{f.name} ({f.department})</option>)}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Subject Name</label>
                                 <input
-                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 outline-none"
-                                    value={selectedCell.data.faculty}
-                                    onChange={(e) => setSelectedCell({ ...selectedCell, data: { ...selectedCell.data, faculty: e.target.value } })}
-                                    placeholder="Dr. Smith"
+                                    required
+                                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+                                    value={formData.subject}
+                                    onChange={e => setFormData({ ...formData, subject: e.target.value })}
+                                    placeholder="e.g. Operating Systems"
                                 />
                             </div>
 
-                            <div className="pt-2 flex gap-3">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Room / Lab</label>
+                                    <input
+                                        required
+                                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 outline-none"
+                                        value={formData.room}
+                                        onChange={e => setFormData({ ...formData, room: e.target.value })}
+                                        placeholder="LH-102"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Starts At</label>
+                                    <select
+                                        className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary-500 outline-none appearance-none"
+                                        value={formData.startTime}
+                                        onChange={e => setFormData({ ...formData, startTime: e.target.value })}
+                                    >
+                                        {timeSlots.map((t, idx) => <option key={t} value={t}>{timeSlotLabels[idx]}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-4 pt-4">
+                                {selectedSlot && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleDelete(selectedSlot._id)}
+                                        className="flex-[1] bg-red-50 text-red-600 rounded-2xl py-4 font-bold hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
+                                    >
+                                        <Trash2 size={20} />
+                                    </button>
+                                )}
                                 <button
-                                    onClick={() => handleCellSave({ subject: '' })}
-                                    className="flex-1 px-4 py-2 border border-red-200 text-red-600 rounded-lg hover:bg-red-50 text-sm font-medium transition-colors"
+                                    type="submit"
+                                    disabled={formSubmitting}
+                                    className="flex-[3] bg-slate-900 text-white rounded-2xl py-4 font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 disabled:opacity-50"
                                 >
-                                    Clear Slot
-                                </button>
-                                <button
-                                    onClick={() => handleCellSave(selectedCell.data)}
-                                    className="flex-1 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 text-sm font-medium transition-colors"
-                                >
-                                    Save
+                                    {formSubmitting ? 'Saving...' : selectedSlot ? 'Update Slot' : 'Create Slot'}
                                 </button>
                             </div>
-                        </div>
+                        </form>
                     </div>
                 </div>
             )}

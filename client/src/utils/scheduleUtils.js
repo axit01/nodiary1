@@ -1,62 +1,46 @@
+/**
+ * scheduleUtils.js
+ * Only keeps time-slot definitions and the live faculty-status helper.
+ * All class/timetable data now comes from the real DB.
+ */
 
-export const timeSlots = ['09:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '01:00 PM', '02:00 PM', '03:00 PM', '04:00 PM'];
-
-export const classes = [
-    { id: 'CS-1A', name: 'CSE - Sem 1 (Sec A)', dept: 'Computer Science' },
-    { id: 'CS-3B', name: 'CSE - Sem 3 (Sec B)', dept: 'Computer Science' },
-    { id: 'ME-2A', name: 'Mech - Sem 2 (Sec A)', dept: 'Mechanical' },
-    { id: 'EE-4A', name: 'Electrical - Sem 4 (Sec A)', dept: 'Electrical' },
-    { id: 'CV-1A', name: 'Civil - Sem 1 (Sec A)', dept: 'Civil' },
+export const timeSlots = [
+    '09:00', '10:00', '11:00', '12:00',
+    '13:00', '14:00', '15:00', '16:00',
 ];
 
-export const getInitialScheduleItem = (classId, timeIdx) => {
-    const seed = classId.charCodeAt(0) + classId.charCodeAt(3) + timeIdx;
-    // Simple deterministic random-ish generation
-    if (seed % 3 === 0) return null;
+export const timeSlotLabels = [
+    '9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM',
+    '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM',
+];
 
-    const subjects = ['Data Structures', 'Thermodynamics', 'Circuits', 'Mechanics', 'Algorithms', 'Calculus', 'Ethics'];
-    const rooms = ['LH-101', 'LH-203', 'Lab-A', 'Workshop-1', 'LH-305'];
-    const types = ['Lecture', 'Lecture', 'Lab', 'Lecture', 'Tutorial'];
-    // Assign faculty deterministically
-    const facultyPool = ['Dr. John Doe', 'Prof. Jane Smith', 'Mr. Michael Johnson', 'Dr. Sarah Wilson', 'Dr. Emily Brown'];
-    const faculty = facultyPool[seed % facultyPool.length];
-
-    return {
-        subject: subjects[seed % subjects.length],
-        room: rooms[seed % rooms.length],
-        type: types[seed % types.length],
-        faculty: faculty
-    };
-};
-
+/** Returns 0-7 index of the current hour in the time-slot list, or -1 if outside hours */
 export const getCurrentTimeSlotIndex = () => {
-    const now = new Date();
-    const currentHour = now.getHours();
-
-    // Convert 24h to the timeSlots index
-    // 09:00 AM -> 9
-    // ...
-    // 04:00 PM -> 16
-
-    // Our slots start at 9 and end at 16 (4 PM)
-    if (currentHour < 9 || currentHour > 16) return -1;
-
-    return currentHour - 9;
+    const h = new Date().getHours();
+    if (h < 9 || h > 16) return -1;
+    return h - 9;
 };
 
-export const getFacultyStatus = (facultyName) => {
+/**
+ * Checks if a faculty member is currently teaching based on real timetable data.
+ * @param {Array} timetable  - array of timetable docs from DB
+ * @param {string} facultyId - faculty._id string
+ */
+export const getFacultyStatusFromTimetable = (timetable, facultyId) => {
     const slotIdx = getCurrentTimeSlotIndex();
-
-    // If outside working hours, everyone is Free (or Away, but let's say Free for simplicity)
     if (slotIdx === -1) return 'Free';
 
-    // Check all classes for this time slot
-    for (const cls of classes) {
-        const session = getInitialScheduleItem(cls.id, slotIdx);
-        if (session && session.faculty === facultyName) {
-            return 'Busy'; // In a class
-        }
-    }
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const today = days[new Date().getDay()];
 
-    return 'Free';
+    const isBusy = timetable.some(
+        slot =>
+            slot.faculty?._id?.toString() === facultyId &&
+            slot.day === today &&
+            slot.startTime === timeSlots[slotIdx]
+    );
+    return isBusy ? 'Busy' : 'Free';
 };
+
+// Keep old getFacultyStatus as a no-op fallback so other imports don't break
+export const getFacultyStatus = () => 'Free';
