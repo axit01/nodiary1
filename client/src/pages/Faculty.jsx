@@ -3,7 +3,7 @@ import {
     Search, Plus, Edit2, Trash2, X, AlertTriangle,
     MoreVertical, Copy, CheckCheck, Mail, KeyRound,
     Smartphone, UserPlus, GraduationCap, Phone,
-    BookOpen, ChevronRight, Filter, Users
+    BookOpen, ChevronRight, Filter, Users, Eye, EyeOff
 } from 'lucide-react';
 import { getFacultyStatus } from '../utils/scheduleUtils';
 import {

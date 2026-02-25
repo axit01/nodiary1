@@ -43,12 +43,14 @@ const hod = (req, res, next) => {
     }
 };
 
-const adminOrHod = (req, res, next) => {
-    if (req.user && (req.user.role === 'admin' || req.user.role === 'hod')) {
+const anyRole = (req, res, next) => {
+    if (req.user && (req.user.role === 'admin' || req.user.role === 'hod' || req.user.role === 'faculty')) {
         next();
     } else {
-        res.status(401).json({ message: 'Not authorized as an Admin or HOD' });
+        res.status(401).json({ message: 'Not authorized' });
     }
 };
 
-module.exports = { protect, admin, hod, adminOrHod };
+const adminOrHod = hod;
+
+module.exports = { protect, admin, hod, adminOrHod, anyRole };

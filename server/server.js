@@ -10,7 +10,8 @@ const jwt = require('jsonwebtoken');
 const connectDB = require('./config/db');
 const Message = require('./models/Message');
 
-dotenv.config();
+const path = require('path');
+dotenv.config({ path: path.join(__dirname, '.env') });
 connectDB();
 
 const app = express();
@@ -78,6 +79,23 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('delete_message', async ({ id, room }) => {
+        try {
+            const msg = await Message.findById(id);
+            if (!msg) return;
+
+            // Optional: check if sender is the one deleting OR if user is admin
+            if (msg.sender.toString() !== userId && role !== 'admin') {
+                return socket.emit('error', { message: 'Unauthorized to delete this message' });
+            }
+
+            await Message.findByIdAndDelete(id);
+            io.to(room).emit('message_deleted', id);
+        } catch (err) {
+            socket.emit('error', { message: err.message });
+        }
+    });
+
     socket.on('disconnect', () => { });
 });
 
@@ -114,26 +132,53 @@ app.get('/api/chat/dm/:otherUserId', protect, async (req, res) => {
     }
 });
 
-// GET /api/chat/dm-threads  — list all users who have DM'd the current admin
+// GET /api/chat/dm-threads  — list all rooms that the current user is part of
 app.get('/api/chat/dm-threads', protect, async (req, res) => {
     try {
         const myId = req.user._id.toString();
-        // find all rooms that include myId
-        const msgs = await Message.aggregate([
-            { $match: { room: { $regex: myId } } },
-            { $sort: { createdAt: -1 } },
-            {
-                $group: {
-                    _id: '$room',
-                    lastMsg: { $first: '$text' },
-                    lastAt: { $first: '$createdAt' },
-                    senderName: { $first: '$senderName' },
-                    senderRole: { $first: '$senderRole' },
-                    senderId: { $first: '$sender' },
+
+        // Find all rooms where my ID is part of the string
+        const rooms = await Message.distinct('room', { room: { $regex: myId } });
+
+        const threads = [];
+        for (const room of rooms) {
+            // Room format: dm_id1_id2
+            const ids = room.replace('dm_', '').split('_');
+            const otherId = ids.find(id => id !== myId);
+
+            if (otherId) {
+                const User = require('./models/User');
+                const lastMsg = await Message.findOne({ room }).sort({ createdAt: -1 });
+                const otherUser = await User.findById(otherId).select('name role');
+
+                if (otherUser) {
+                    threads.push({
+                        _id: room,
+                        room: room,
+                        senderName: otherUser.name,
+                        senderRole: otherUser.role,
+                        senderId: otherId,
+                        lastMsg: lastMsg ? lastMsg.text : '',
+                        lastAt: lastMsg ? lastMsg.createdAt : null
+                    });
                 }
-            },
-        ]);
-        res.json(msgs);
+            }
+        }
+
+        // Sort by most recent
+        threads.sort((a, b) => (b.lastAt || 0) - (a.lastAt || 0));
+        res.json(threads);
+    } catch (e) {
+        res.status(500).json({ message: e.message });
+    }
+});
+
+// GET /api/chat/admins — get all admins to start a conversation with
+app.get('/api/chat/admins', protect, async (req, res) => {
+    try {
+        const User = require('./models/User');
+        const admins = await User.find({ role: 'admin' }).select('name role');
+        res.json(admins);
     } catch (e) {
         res.status(500).json({ message: e.message });
     }
@@ -143,6 +188,7 @@ app.get('/api/chat/dm-threads', protect, async (req, res) => {
 app.get('/', (req, res) => res.send('CampusOps Admin API is running...'));
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
+app.use('/api/faculty', require('./routes/facultyRoutes'));
 
 // ── Start ──────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;

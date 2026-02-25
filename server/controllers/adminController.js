@@ -75,9 +75,11 @@ const getFaculty = async (req, res) => {
         const { search, department } = req.query;
         const query = {};
 
-        // Force HODs to only see their department
+        // Filtering
         if (req.user.role === 'hod') {
             query.department = req.user.department;
+        } else if (req.user.role === 'faculty') {
+            query.email = req.user.email; // Faculty can only see their own profile in this search
         } else if (department) {
             query.department = department;
         }
@@ -167,6 +169,14 @@ const addFaculty = async (req, res) => {
 
 const updateFaculty = async (req, res) => {
     try {
+        const facultyToUpdate = await Faculty.findById(req.params.id);
+        if (!facultyToUpdate) return res.status(404).json({ message: 'Faculty not found' });
+
+        // Security: Faculty can only update themselves
+        if (req.user.role === 'faculty' && facultyToUpdate.email !== req.user.email) {
+            return res.status(403).json({ message: 'Forbidden: You can only update your own profile' });
+        }
+
         const updated = await Faculty.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
 
         // Sync role and department in User model
@@ -214,6 +224,9 @@ const getTasks = async (req, res) => {
             const deptFaculty = await Faculty.find({ department: req.user.department }).select('_id');
             const facultyIds = deptFaculty.map(f => f._id);
             query.assignedTo = { $in: facultyIds };
+        } else if (req.user.role === 'faculty') {
+            const myProfile = await Faculty.findOne({ email: req.user.email });
+            query.assignedTo = myProfile ? myProfile._id : req.user._id;
         } else if (assignedTo) {
             query.assignedTo = assignedTo;
         }
@@ -239,7 +252,7 @@ const createTask = async (req, res) => {
         await Notification.create({
             faculty: assignedTo,
             title: 'New Task Assigned',
-            message: `You have been assigned a new task: "${title}". Due: ${new Date(dueDate).toLocaleDateString()}`,
+            message: `A new task "${title}" has been assigned to you by the Admin. Priority: ${priority}. Due: ${new Date(dueDate).toLocaleDateString()}. Action required: Accept or Reject.`,
             type: 'task',
             relatedId: task._id,
         });
@@ -279,6 +292,14 @@ const updateTask = async (req, res) => {
         const task = await Task.findById(req.params.id);
         if (!task) return res.status(404).json({ message: 'Task not found' });
 
+        // Security: Faculty can only update tasks assigned to them
+        if (req.user.role === 'faculty') {
+            const myProfile = await Faculty.findOne({ email: req.user.email });
+            if (!myProfile || task.assignedTo.toString() !== myProfile._id.toString()) {
+                return res.status(403).json({ message: 'Forbidden: You can only update your own tasks' });
+            }
+        }
+
         const updated = await Task.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
         res.json(updated);
     } catch (error) {
@@ -309,6 +330,11 @@ const getMeetings = async (req, res) => {
             const deptFaculty = await Faculty.find({ department: req.user.department }).select('_id');
             const facultyIds = deptFaculty.map(f => f._id);
             query.participants = { $in: facultyIds };
+        } else if (req.user.role === 'faculty') {
+            const myProfile = await Faculty.findOne({ email: req.user.email });
+            if (myProfile) {
+                query.participants = myProfile._id;
+            }
         }
 
         const meetings = await Meeting.find(query)
@@ -334,8 +360,8 @@ const createMeeting = async (req, res) => {
             // 1. Create In-App Notifications
             const notifications = participants.map(facultyId => ({
                 faculty: facultyId,
-                title: 'Meeting Scheduled',
-                message: `You have a meeting: "${title}" on ${new Date(date).toLocaleDateString()} at ${startTime} - ${endTime}.`,
+                title: 'Meeting Scheduled by Admin',
+                message: `Admin has scheduled a meeting: "${title}". \n📍 Location: ${location || 'N/A'}\n⏰ Time: ${new Date(date).toLocaleDateString()} at ${startTime} - ${endTime}\n📝 Details: ${description || 'No additional details.'}`,
                 type: 'meeting',
                 relatedId: meeting._id,
             }));
@@ -415,6 +441,25 @@ const getFacultyNotifications = async (req, res) => {
             .sort({ createdAt: -1 })
             .limit(50);
         res.json(notifications);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+const respondToTask = async (req, res) => {
+    try {
+        const { taskId, notificationId, action } = req.body; // action: 'Accepted' or 'Rejected'
+        const task = await Task.findById(taskId);
+        if (!task) return res.status(404).json({ message: 'Task not found' });
+
+        task.status = action;
+        await task.save();
+
+        if (notificationId) {
+            await Notification.findByIdAndUpdate(notificationId, { isRead: true });
+        }
+
+        res.json({ message: `Task ${action.toLowerCase()} successfully`, task });
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
@@ -609,6 +654,11 @@ const getTimetable = async (req, res) => {
             const deptFaculty = await Faculty.find({ department: req.user.department }).select('_id');
             const facultyIds = deptFaculty.map(f => f._id);
             query.faculty = { $in: facultyIds };
+        } else if (req.user.role === 'faculty') {
+            const myProfile = await Faculty.findOne({ email: req.user.email });
+            if (myProfile) {
+                query.faculty = myProfile._id;
+            }
         }
 
         const slots = await Timetable.find(query)
@@ -621,7 +671,15 @@ const getTimetable = async (req, res) => {
 // POST /api/admin/timetable
 const addTimetableSlot = async (req, res) => {
     try {
-        const { faculty, subject, room, day, startTime, endTime, classSection } = req.body;
+        let { faculty, subject, room, day, startTime, endTime, classSection } = req.body;
+
+        // If faculty role, auto-assign their own faculty ID
+        if (req.user.role === 'faculty') {
+            const myProfile = await Faculty.findOne({ email: req.user.email });
+            if (!myProfile) return res.status(404).json({ message: 'Faculty profile not found' });
+            faculty = myProfile._id;
+        }
+
         const slot = await Timetable.create({ faculty, subject, room, day, startTime, endTime, classSection });
         const populated = await slot.populate('faculty', 'name department designation');
         res.status(201).json(populated);
@@ -631,20 +689,58 @@ const addTimetableSlot = async (req, res) => {
 // PUT /api/admin/timetable/:id
 const updateTimetableSlot = async (req, res) => {
     try {
-        const slot = await Timetable.findByIdAndUpdate(req.params.id, req.body, { new: true })
-            .populate('faculty', 'name department designation');
+        const slot = await Timetable.findById(req.params.id);
         if (!slot) return res.status(404).json({ message: 'Slot not found' });
-        res.json(slot);
+
+        // Faculty can only update their own slots
+        if (req.user.role === 'faculty') {
+            const myProfile = await Faculty.findOne({ email: req.user.email });
+            if (!myProfile || slot.faculty.toString() !== myProfile._id.toString()) {
+                return res.status(403).json({ message: 'You can only edit your own schedule' });
+            }
+        }
+
+        const updated = await Timetable.findByIdAndUpdate(req.params.id, req.body, { new: true })
+            .populate('faculty', 'name department designation');
+        res.json(updated);
     } catch (e) { res.status(400).json({ message: e.message }); }
 };
 
 // DELETE /api/admin/timetable/:id
 const deleteTimetableSlot = async (req, res) => {
     try {
-        const slot = await Timetable.findByIdAndDelete(req.params.id);
+        const slot = await Timetable.findById(req.params.id);
         if (!slot) return res.status(404).json({ message: 'Slot not found' });
+
+        // Faculty can only delete their own slots
+        if (req.user.role === 'faculty') {
+            const myProfile = await Faculty.findOne({ email: req.user.email });
+            if (!myProfile || slot.faculty.toString() !== myProfile._id.toString()) {
+                return res.status(403).json({ message: 'You can only delete your own schedule' });
+            }
+        }
+
+        await Timetable.findByIdAndDelete(req.params.id);
         res.json({ message: 'Slot deleted' });
     } catch (e) { res.status(500).json({ message: e.message }); }
+};
+
+const changePassword = async (req, res) => {
+    try {
+        const { old, new: newPass, email } = req.body;
+        const user = await User.findOne({ email });
+
+        if (!user || !(await user.matchPassword(old))) {
+            return res.status(401).json({ message: 'Invalid current password' });
+        }
+
+        user.password = newPass;
+        await user.save();
+
+        res.json({ message: 'Password updated successfully' });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
 };
 
 module.exports = {
@@ -656,4 +752,5 @@ module.exports = {
     getCourses, addCourse, deleteCourse,
     getDepartments, addDepartment, deleteDepartment,
     getTimetable, addTimetableSlot, updateTimetableSlot, deleteTimetableSlot,
+    changePassword, respondToTask
 };

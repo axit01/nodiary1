@@ -23,6 +23,8 @@ const userSchema = mongoose.Schema({
     department: {
         type: String, // Department ID/Code (e.g., 'CS', 'ME') - primarily for HODs
     },
+    resetPasswordToken: String,
+    resetPasswordExpire: Date,
 }, {
     timestamps: true,
 });

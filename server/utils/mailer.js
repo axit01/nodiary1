@@ -3,11 +3,11 @@ const nodemailer = require('nodemailer');
 // ── Transporter ───────────────────────────────────────────────────────────────
 // Uses Gmail. Set SMTP_USER and SMTP_PASS (App Password) in .env
 const createTransporter = () => nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,   // Gmail App Password (16 chars, no spaces)
-    },
+  service: 'gmail',
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS,   // Gmail App Password (16 chars, no spaces)
+  },
 });
 
 // ── HTML Email Template ───────────────────────────────────────────────────────
@@ -85,10 +85,10 @@ const buildInviteHTML = ({ name, email, password, collegeName }) => `
               <p style="color:#475569;font-size:14px;font-weight:600;margin:0 0 12px;">Getting started:</p>
               <table width="100%">
                 ${[
-        ['1', 'Download the <strong>CampusOps Faculty App</strong>'],
-        ['2', 'Enter your email & password above'],
-        ['3', 'Update your password from Settings'],
-    ].map(([n, text]) => `
+    ['1', 'Download the <strong>CampusOps Faculty App</strong>'],
+    ['2', 'Enter your email & password above'],
+    ['3', 'Update your password from Settings'],
+  ].map(([n, text]) => `
                 <tr>
                   <td style="padding:6px 0;vertical-align:top;">
                     <span style="display:inline-block;width:24px;height:24px;background:#1e293b;color:#fff;border-radius:50%;text-align:center;line-height:24px;font-size:12px;font-weight:700;margin-right:10px;">${n}</span>
@@ -116,25 +116,69 @@ const buildInviteHTML = ({ name, email, password, collegeName }) => `
 </html>
 `;
 
+// ── Reset HTML Template ───────────────────────────────────────────────────────
+const buildResetHTML = ({ name, resetLink }) => `
+<!DOCTYPE html>
+<html>
+<body style="font-family: sans-serif; padding: 20px; line-height: 1.6; color: #334155;">
+    <div style="max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+        <div style="background: #1e293b; padding: 20px; text-align: center;">
+            <h2 style="color: white; margin: 0;">Password Reset</h2>
+        </div>
+        <div style="padding: 40px;">
+            <p>Hello ${name},</p>
+            <p>We received a request to reset your password for your <strong>CampusOps</strong> account. Click the button below to proceed:</p>
+            <div style="text-align: center; margin: 40px 0;">
+                <a href="${resetLink}" style="display: inline-block; padding: 14px 28px; background-color: #2563eb; color: white; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">Reset My Password</a>
+            </div>
+            <p style="color: #64748b; font-size: 14px;">This link will expire in 30 minutes. If you did not request this, you can safely ignore this email.</p>
+        </div>
+        <div style="background: #f8fafc; padding: 20px; text-align: center; border-top: 1px solid #e2e8f0;">
+            <p style="margin: 0; color: #94a3b8; font-size: 12px;">© 2026 CampusOps. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>
+`;
+
 // ── Main export ───────────────────────────────────────────────────────────────
 const sendInviteEmail = async ({ name, email, password, collegeName }) => {
-    // Silently skip if SMTP is not configured
-    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-        console.warn('⚠️  SMTP not configured — skipping invite email for', email);
-        return { sent: false, reason: 'SMTP not configured' };
-    }
+  // Silently skip if SMTP is not configured
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.warn('⚠️  SMTP not configured — skipping invite email for', email);
+    return { sent: false, reason: 'SMTP not configured' };
+  }
 
-    const transporter = createTransporter();
+  const transporter = createTransporter();
 
-    await transporter.sendMail({
-        from: `"CampusOps 🎓" <${process.env.SMTP_USER}>`,
-        to: email,
-        subject: '🎓 Your CampusOps Faculty Account is Ready!',
-        html: buildInviteHTML({ name, email, password, collegeName }),
-    });
+  await transporter.sendMail({
+    from: `"CampusOps 🎓" <${process.env.SMTP_USER}>`,
+    to: email,
+    subject: '🎓 Your CampusOps Faculty Account is Ready!',
+    html: buildInviteHTML({ name, email, password, collegeName }),
+  });
 
-    console.log(`✅ Invite email sent → ${email}`);
-    return { sent: true };
+  console.log(`✅ Invite email sent → ${email}`);
+  return { sent: true };
 };
 
-module.exports = { sendInviteEmail };
+const sendResetEmail = async ({ name, email, resetLink }) => {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    console.warn('⚠️  SMTP not configured — skipping reset email for', email);
+    return { sent: false, reason: 'SMTP not configured' };
+  }
+
+  const transporter = createTransporter();
+
+  await transporter.sendMail({
+    from: `"CampusOps 🎓" <${process.env.SMTP_USER}>`,
+    to: email,
+    subject: 'Password Reset Request - CampusOps',
+    html: buildResetHTML({ name, resetLink }),
+  });
+
+  console.log(`✅ Reset email sent → ${email}`);
+  return { sent: true };
+};
+
+module.exports = { sendInviteEmail, sendResetEmail };
