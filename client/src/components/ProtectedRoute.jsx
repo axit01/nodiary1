@@ -6,7 +6,12 @@ const ProtectedRoute = ({ children }) => {
     const location = useLocation();
 
     if (loading) {
-        return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 gap-4">
+                <div className="w-10 h-10 border-[3px] border-slate-100 border-t-indigo-600 rounded-full animate-spin"></div>
+                <p className="text-slate-400 font-medium text-sm animate-pulse">Authenticating...</p>
+            </div>
+        );
     }
 
     if (!user) {

@@ -13,7 +13,18 @@ const protect = async (req, res, next) => {
 
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-            req.user = await User.findById(decoded.id).select('-password');
+            // If the JWT already carries user info, skip DB hit for speed
+            if (decoded.name && decoded.role) {
+                req.user = {
+                    _id: decoded.id,
+                    name: decoded.name,
+                    role: decoded.role,
+                    department: decoded.department,
+                };
+            } else {
+                // Fallback to DB for older tokens
+                req.user = await User.findById(decoded.id).select('-password');
+            }
 
             next();
         } catch (error) {

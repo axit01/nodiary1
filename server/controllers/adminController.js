@@ -18,40 +18,37 @@ const getDashboardStats = async (req, res) => {
         const isHod = req.user.role === 'hod';
         const dept = req.user.department;
 
-        // Filtering for HODs
-        const facultyQuery = isHod ? { department: dept } : {};
-
-        let taskQuery = { status: { $nin: ['Verified', 'Completed'] } };
+        // For HODs, fetch department faculty IDs ONCE and reuse
+        let facultyIds = null;
         if (isHod) {
-            const deptFaculty = await Faculty.find({ department: dept }).select('_id');
-            const facultyIds = deptFaculty.map(f => f._id);
-            taskQuery.assignedTo = { $in: facultyIds };
+            const deptFaculty = await Faculty.find({ department: dept }).select('_id').lean();
+            facultyIds = deptFaculty.map(f => f._id);
         }
 
-        const totalFaculty = await Faculty.countDocuments(facultyQuery);
-        const activeTasks = await Task.countDocuments(taskQuery);
+        const facultyQuery = isHod ? { department: dept } : {};
+        const taskQuery = { status: { $nin: ['Verified', 'Completed'] } };
+        if (isHod) taskQuery.assignedTo = { $in: facultyIds };
 
         const todayStart = new Date(new Date().setHours(0, 0, 0, 0));
         const todayEnd = new Date(new Date().setHours(23, 59, 59, 999));
+        const meetingQuery = { date: { $gte: todayStart, $lt: todayEnd } };
+        if (isHod) meetingQuery.participants = { $in: facultyIds };
 
-        let meetingQuery = { date: { $gte: todayStart, $lt: todayEnd } };
-        if (isHod) {
-            const deptFaculty = await Faculty.find({ department: dept }).select('_id');
-            const facultyIds = deptFaculty.map(f => f._id);
-            meetingQuery.participants = { $in: facultyIds };
-        }
-
-        const meetingsToday = await Meeting.countDocuments(meetingQuery);
-
-        const taskStats = await Task.aggregate([
-            ...(isHod ? [{ $match: taskQuery }] : []),
-            { $group: { _id: '$status', count: { $sum: 1 } } }
-        ]);
-
-        const facultyStatusStats = await Faculty.aggregate([
-            ...(isHod ? [{ $match: { department: dept } }] : []),
-            { $group: { _id: '$status', count: { $sum: 1 } } }
-        ]);
+        // Run all queries in parallel for speed
+        const [totalFaculty, activeTasks, meetingsToday, taskStats, facultyStatusStats] =
+            await Promise.all([
+                Faculty.countDocuments(facultyQuery),
+                Task.countDocuments(taskQuery),
+                Meeting.countDocuments(meetingQuery),
+                Task.aggregate([
+                    ...(isHod ? [{ $match: taskQuery }] : []),
+                    { $group: { _id: '$status', count: { $sum: 1 } } }
+                ]),
+                Faculty.aggregate([
+                    ...(isHod ? [{ $match: { department: dept } }] : []),
+                    { $group: { _id: '$status', count: { $sum: 1 } } }
+                ]),
+            ]);
 
         res.json({ totalFaculty, activeTasks, meetingsToday, taskStats, facultyStatusStats });
     } catch (error) {

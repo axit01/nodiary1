@@ -99,10 +99,15 @@ const Header = ({ toggleSidebar, user }) => {
     const [messages, setMessages] = useState([]);
     const [connected, setConnected] = useState(false);
     const socketRef = useRef(null);
+    const chatInitializedRef = useRef(false);
 
-    // Socket Connection Setup
+    // Socket Connection Setup — LAZY: only connect when chat popover is opened
     useEffect(() => {
+        if (activePopover !== 'chat') return;
         if (!user?.token) return;
+        if (chatInitializedRef.current) return; // already connected
+
+        chatInitializedRef.current = true;
 
         const socket = io(SOCKET_URL, {
             auth: { token: user.token },
@@ -132,8 +137,11 @@ const Header = ({ toggleSidebar, user }) => {
         };
         loadHistory();
 
-        return () => socket.disconnect();
-    }, [user?.token]);
+        return () => {
+            socket.disconnect();
+            chatInitializedRef.current = false;
+        };
+    }, [activePopover, user?.token]);
 
     const [inputText, setInputText] = useState('');
 
