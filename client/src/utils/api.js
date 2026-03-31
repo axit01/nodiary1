@@ -112,4 +112,7 @@ export const getDMHistoryAPI = (otherUserId) =>
 export const getDMThreadsAPI = () =>
     api.get('/chat/dm-threads');
 
+export const getAdminsAPI = () =>
+    api.get('/chat/admins');
+
 export default api;

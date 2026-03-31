@@ -12,7 +12,12 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         const userInfo = localStorage.getItem('userInfo');
         if (userInfo) {
-            setUser(JSON.parse(userInfo));
+            try {
+                setUser(JSON.parse(userInfo));
+            } catch (err) {
+                console.error("Corrupt userInfo in localStorage:", err);
+                localStorage.removeItem('userInfo');
+            }
         }
         setLoading(false);
     }, []);

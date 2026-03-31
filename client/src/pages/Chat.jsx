@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { io } from 'socket.io-client';
 import { useAuth } from '../context/AuthContext';
-import { getOverallHistoryAPI, getDMHistoryAPI, getDMThreadsAPI } from '../utils/api';
+import { getOverallHistoryAPI, getDMHistoryAPI, getDMThreadsAPI, getAdminsAPI } from '../utils/api';
 import {
     MessageSquare, Users, User, Send, Hash,
-    ArrowLeft, Clock, Wifi, WifiOff,
+    ArrowLeft, Clock, Wifi, WifiOff, Search, PlusCircle, UserPlus
 } from 'lucide-react';
 
 const SOCKET_URL = 'http://localhost:5000';
@@ -29,7 +29,6 @@ const formatDate = (iso) => {
     return d.toLocaleDateString([], { day: 'numeric', month: 'short' });
 };
 
-// group messages by date for dividers
 const groupByDate = (msgs) => {
     const groups = [];
     let lastDate = null;
@@ -41,7 +40,6 @@ const groupByDate = (msgs) => {
     return groups;
 };
 
-// Avatar initials + colour
 const AVATAR_COLORS = [
     'bg-violet-500', 'bg-blue-500', 'bg-emerald-500', 'bg-rose-500',
     'bg-amber-500', 'bg-cyan-500', 'bg-fuchsia-500', 'bg-teal-500',
@@ -77,7 +75,7 @@ const Bubble = ({ msg, isMe }) => (
     </div>
 );
 
-// ── Message List (scrolls to bottom) ─────────────────────────────────────────
+// ── Message List ─────────────────────────────────────────────────────────────
 const MessageList = ({ messages, userId }) => {
     const bottomRef = useRef(null);
     const grouped = groupByDate(messages);
@@ -114,7 +112,6 @@ const InputBar = ({ onSend, disabled }) => {
     const [text, setText] = useState('');
     const taRef = useRef(null);
 
-    // Auto-resize textarea
     const resize = () => {
         const ta = taRef.current;
         if (!ta) return;
@@ -159,73 +156,93 @@ const InputBar = ({ onSend, disabled }) => {
     );
 };
 
-// ── Faculty Thread Card ───────────────────────────────────────────────────────
+// ── Thread/Admin Card ────────────────────────────────────────────────────────
 const ThreadCard = ({ thread, myId, onClick }) => {
-    // extract the other user's id from room string dm_A_B
-    const parts = thread._id.split('_'); // ['dm', id1, id2]
-    const otherId = parts[1] === myId ? parts[2] : parts[1];
+    const parts = thread._id.split('_');
+    const otherId = parts.length > 1 ? (parts[1] === myId ? parts[2] : parts[1]) : thread.senderId;
 
     return (
         <button
             onClick={() => onClick({ id: otherId, name: thread.senderName, role: thread.senderRole })}
-            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left border-b border-gray-50"
+            className="w-full flex items-center gap-4 px-6 py-4 hover:bg-slate-50 transition-all text-left border-b border-gray-50 group"
         >
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 ${avatarColor(thread.senderName)}`}>
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white text-lg font-black flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform ${avatarColor(thread.senderName)}`}>
                 {initials(thread.senderName)}
             </div>
             <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-800 truncate">{thread.senderName}</p>
-                <p className="text-xs text-gray-400 truncate">{thread.lastMsg}</p>
-            </div>
-            <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                <span className="text-[10px] text-gray-400">{formatTime(thread.lastAt)}</span>
-                <span className="text-[10px] text-gray-300 capitalize">{thread.senderRole}</span>
+                <div className="flex justify-between items-center mb-0.5">
+                    <p className="text-sm font-bold text-slate-900 truncate">{thread.senderName}</p>
+                    {thread.lastAt && <span className="text-[10px] text-gray-400 font-medium">{formatTime(thread.lastAt)}</span>}
+                </div>
+                <p className="text-xs text-gray-400 truncate font-medium">{thread.lastMsg || 'Tap to start conversation'}</p>
             </div>
         </button>
     );
 };
 
+// ── Tab Bar component ─────────────────────────────────────────────────────────
+const TabBar = ({ active, onChange, connected }) => (
+    <div className="bg-white border-b border-gray-100 flex-shrink-0">
+        <div className="max-w-md mx-auto px-4 py-4">
+            <div className="bg-slate-100 p-1 rounded-2xl flex gap-1 relative overflow-hidden">
+                {[
+                    { id: 'overall', label: 'Overall Channel', icon: Users },
+                    { id: 'personal', label: 'Private Messages', icon: User },
+                ].map(tab => (
+                    <button
+                        key={tab.id}
+                        onClick={() => onChange(tab.id)}
+                        className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 relative z-10 ${active === tab.id
+                            ? 'bg-white text-slate-900 shadow-sm'
+                            : 'text-slate-400 hover:text-slate-600'
+                            }`}
+                    >
+                        <tab.icon size={14} className={active === tab.id ? 'text-indigo-600' : ''} />
+                        {tab.label}
+                    </button>
+                ))}
+            </div>
+        </div>
+        {/* Connection status bar */}
+        {!connected && (
+            <div className="bg-amber-50 text-amber-600 text-[10px] py-1 px-4 font-black uppercase tracking-[0.2em] text-center border-b border-amber-100">
+                Connection lost • Attempting to reconnect...
+            </div>
+        )}
+    </div>
+);
+
 // ── Main Chat Page ────────────────────────────────────────────────────────────
 const Chat = () => {
     const { user } = useAuth();
-    const [activeTab, setActiveTab] = useState('overall');  // 'overall' | 'personal'
+    const [activeTab, setActiveTab] = useState('overall');
     const [messages, setMessages] = useState([]);
-    const [threads, setThreads] = useState([]);         // DM thread list
-    const [activeDM, setActiveDM] = useState(null);       // { id, name, role }
+    const [threads, setThreads] = useState([]);
+    const [admins, setAdmins] = useState([]);
+    const [activeDM, setActiveDM] = useState(null);
     const [connected, setConnected] = useState(false);
     const [loadingMsgs, setLoadingMsgs] = useState(false);
     const socketRef = useRef(null);
     const currentRoom = useRef('overall');
 
-    // ── Socket setup ────────────────────────────────────────────────────────
     useEffect(() => {
         if (!user?.token) return;
-
-        const socket = io(SOCKET_URL, {
-            auth: { token: user.token },
-            transports: ['websocket'],
-        });
+        const socket = io(SOCKET_URL, { auth: { token: user.token }, transports: ['websocket'] });
         socketRef.current = socket;
-
-        socket.on('connect', () => setConnected(true));
+        socket.on('connect', () => {
+            setConnected(true);
+            socket.emit('join_room', currentRoom.current);
+        });
         socket.on('disconnect', () => setConnected(false));
-
         socket.on('receive_message', (msg) => {
             if (msg.room === currentRoom.current) {
                 setMessages(prev => [...prev, msg]);
             }
-            // Refresh DM thread list whenever any personal message arrives
             if (msg.room.startsWith('dm_')) loadThreads();
         });
-
-        // Join overall on mount
-        socket.emit('join_room', 'overall');
-
         return () => socket.disconnect();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [user?.token]);
 
-    // ── Load message history ────────────────────────────────────────────────
     const loadOverall = useCallback(async () => {
         setLoadingMsgs(true);
         try {
@@ -251,7 +268,13 @@ const Chat = () => {
         } catch { setThreads([]); }
     }, []);
 
-    // Load data on tab change
+    const loadAdmins = useCallback(async () => {
+        try {
+            const { data } = await getAdminsAPI();
+            setAdmins(data.filter(a => a._id !== user._id));
+        } catch { setAdmins([]); }
+    }, [user._id]);
+
     useEffect(() => {
         if (activeTab === 'overall') {
             currentRoom.current = 'overall';
@@ -260,11 +283,11 @@ const Chat = () => {
             setActiveDM(null);
         } else {
             loadThreads();
+            if (user.role !== 'admin') loadAdmins();
             setMessages([]);
         }
-    }, [activeTab, loadOverall, loadThreads]);
+    }, [activeTab, loadOverall, loadThreads, loadAdmins, user.role]);
 
-    // Open a DM conversation
     const openDM = (peer) => {
         setActiveDM(peer);
         const room = dmRoom(user._id, peer.id);
@@ -275,10 +298,10 @@ const Chat = () => {
 
     const closeDM = () => {
         setActiveDM(null);
+        currentRoom.current = 'personal-list';
         setMessages([]);
     };
 
-    // Send handler
     const handleSend = (text) => {
         if (!socketRef.current || !connected) return;
         socketRef.current.emit('send_message', { room: currentRoom.current, text });
@@ -286,116 +309,113 @@ const Chat = () => {
 
     const userId = user?._id;
 
-    // ── Render: Personal tab — DM open ──────────────────────────────────────
-    if (activeTab === 'personal' && activeDM) {
-        return (
-            <div className="flex flex-col h-full bg-gray-50">
-                {/* Tab Bar */}
-                <TabBar active={activeTab} onChange={setActiveTab} connected={connected} />
-
-                {/* DM Header */}
-                <div className="flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-100 shadow-sm">
-                    <button onClick={closeDM} className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
-                        <ArrowLeft size={18} className="text-gray-500" />
-                    </button>
-                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold ${avatarColor(activeDM.name)}`}>
-                        {initials(activeDM.name)}
-                    </div>
-                    <div>
-                        <p className="text-sm font-semibold text-gray-900">{activeDM.name}</p>
-                        <p className="text-xs text-gray-400 capitalize">{activeDM.role}</p>
-                    </div>
-                </div>
-
-                {loadingMsgs
-                    ? <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">Loading…</div>
-                    : <MessageList messages={messages} userId={userId} />
-                }
-                <InputBar onSend={handleSend} disabled={!connected} />
-            </div>
-        );
-    }
-
-    // ── Render: Normal layout ────────────────────────────────────────────────
     return (
-        <div className="flex flex-col h-full bg-gray-50">
+        <div className="flex flex-col h-full bg-slate-50">
             <TabBar active={activeTab} onChange={setActiveTab} connected={connected} />
 
-            {activeTab === 'overall' ? (
-                <>
-                    {/* Overall header */}
-                    <div className="flex items-center gap-2 px-4 py-3 bg-white border-b border-gray-100">
-                        <Hash size={16} className="text-gray-400" />
-                        <p className="text-sm font-semibold text-gray-700">Overall — All Faculty &amp; Admin</p>
-                    </div>
-
-                    {loadingMsgs
-                        ? <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">Loading…</div>
-                        : <MessageList messages={messages} userId={userId} />
-                    }
-                    <InputBar onSend={handleSend} disabled={!connected} />
-                </>
-            ) : (
-                /* Personal tab — thread list */
-                <>
-                    <div className="flex items-center gap-2 px-4 py-3 bg-white border-b border-gray-100">
-                        <User size={16} className="text-gray-400" />
-                        <p className="text-sm font-semibold text-gray-700">Personal Messages</p>
-                    </div>
-
-                    <div className="flex-1 overflow-y-auto bg-white">
-                        {threads.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-3 py-16">
-                                <User size={40} className="text-gray-200" />
-                                <p className="text-sm text-center px-8">
-                                    No personal chats yet.<br />
-                                    Faculty members can message you from their app — their name will appear here.
-                                </p>
+            <div className="flex-1 flex flex-col overflow-hidden">
+                {activeTab === 'overall' ? (
+                    <div className="flex-1 flex flex-col overflow-hidden bg-white">
+                        <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-50 bg-white">
+                            <div className="w-10 h-10 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+                                <Hash size={20} />
                             </div>
-                        ) : (
-                            threads.map(t => (
-                                <ThreadCard
-                                    key={t._id}
-                                    thread={t}
-                                    myId={userId}
-                                    onClick={openDM}
-                                />
-                            ))
-                        )}
+                            <div>
+                                <p className="text-sm font-black text-slate-900 tracking-tight">Main Channel</p>
+                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Public Campus Hall</p>
+                            </div>
+                        </div>
+
+                        {loadingMsgs
+                            ? <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">Synchronizing pulse…</div>
+                            : <MessageList messages={messages} userId={userId} />
+                        }
+                        <InputBar onSend={handleSend} disabled={!connected} />
                     </div>
-                </>
-            )}
+                ) : activeDM ? (
+                    <div className="flex-1 flex flex-col overflow-hidden bg-white">
+                        <div className="flex items-center gap-4 px-6 py-4 border-b border-gray-50 bg-white">
+                            <button onClick={closeDM} className="p-2 hover:bg-slate-50 rounded-xl transition-colors">
+                                <ArrowLeft size={18} className="text-gray-500" />
+                            </button>
+                            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-white text-lg font-black shadow-sm ${avatarColor(activeDM.name)}`}>
+                                {initials(activeDM.name)}
+                            </div>
+                            <div>
+                                <p className="text-sm font-black text-slate-900 tracking-tight">{activeDM.name}</p>
+                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Secure Endpoint • {activeDM.role}</p>
+                            </div>
+                        </div>
+
+                        {loadingMsgs
+                            ? <div className="flex-1 flex items-center justify-center text-gray-400 text-sm">Decrypting logs…</div>
+                            : <MessageList messages={messages} userId={userId} />
+                        }
+                        <InputBar onSend={handleSend} disabled={!connected} />
+                    </div>
+                ) : (
+                    <div className="flex-1 flex flex-col overflow-hidden bg-white">
+                        <div className="px-6 py-4 border-b border-gray-50 flex justify-between items-center bg-white">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+                                    <User size={20} />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-black text-slate-900 tracking-tight">Private Threads</p>
+                                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">End-to-end encrypted</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto bg-white custom-scrollbar">
+                            {threads.length === 0 && admins.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center h-full text-center px-10 py-20 grayscale opacity-40">
+                                    <MessageSquare size={64} className="text-slate-200 mb-6" />
+                                    <h3 className="text-lg font-black text-slate-900 tracking-tight mb-2 uppercase">Silence in Sector</h3>
+                                    <p className="text-xs font-bold text-slate-400 leading-relaxed uppercase tracking-widest">
+                                        No active conversations found.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="divide-y divide-gray-50">
+                                    {threads.length > 0 && (
+                                        <>
+                                            <p className="px-6 pt-6 pb-2 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Active Sessions</p>
+                                            {threads.map(t => (
+                                                <ThreadCard key={t._id} thread={t} myId={userId} onClick={openDM} />
+                                            ))}
+                                        </>
+                                    )}
+
+                                    {user.role !== 'admin' && admins.length > 0 && (
+                                        <>
+                                            <p className="px-6 pt-6 pb-2 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Available Administrators</p>
+                                            {admins.map(admin => (
+                                                <button
+                                                    key={admin._id}
+                                                    onClick={() => openDM({ id: admin._id, name: admin.name, role: admin.role })}
+                                                    className="w-full flex items-center gap-4 px-6 py-4 hover:bg-slate-50 transition-all text-left group"
+                                                >
+                                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white text-lg font-black flex-shrink-0 shadow-sm group-hover:scale-105 transition-transform ${avatarColor(admin.name)}`}>
+                                                        {initials(admin.name)}
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <p className="text-sm font-bold text-slate-900">{admin.name}</p>
+                                                        <p className="text-[10px] text-indigo-500 font-black uppercase tracking-widest mt-0.5">Start Conversation</p>
+                                                    </div>
+                                                    <PlusCircle size={20} className="text-slate-200 group-hover:text-indigo-500 transition-colors" />
+                                                </button>
+                                            ))}
+                                        </>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
-
-// ── Tab Bar component ─────────────────────────────────────────────────────────
-const TabBar = ({ active, onChange, connected }) => (
-    <div className="flex items-center justify-between px-4 pt-4 pb-0 bg-white border-b border-gray-100">
-        <div className="flex gap-1">
-            {[
-                { id: 'overall', label: 'Overall', icon: Users },
-                { id: 'personal', label: 'Personal', icon: User },
-            ].map(tab => (
-                <button
-                    key={tab.id}
-                    onClick={() => onChange(tab.id)}
-                    className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-lg border-b-2 transition-colors ${active === tab.id
-                        ? 'border-slate-900 text-slate-900 bg-slate-50'
-                        : 'border-transparent text-gray-500 hover:text-gray-700'
-                        }`}
-                >
-                    <tab.icon size={15} />
-                    {tab.label}
-                </button>
-            ))}
-        </div>
-        {/* Connection indicator */}
-        <div className={`flex items-center gap-1.5 text-xs mb-1 ${connected ? 'text-emerald-600' : 'text-gray-400'}`}>
-            {connected ? <Wifi size={13} /> : <WifiOff size={13} />}
-            {connected ? 'Live' : 'Connecting…'}
-        </div>
-    </div>
-);
 
 export default Chat;

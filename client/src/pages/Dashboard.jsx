@@ -12,21 +12,28 @@ import { useNavigate } from 'react-router-dom';
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend, ArcElement, BarElement, Filler);
 
 const StatsCard = ({ title, value, icon: Icon, color, trend, subtitle }) => (
-    <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300 group">
-        <div className="flex justify-between items-start mb-4">
-            <div className={`p-3 rounded-2xl ${color} bg-opacity-10 transition-colors group-hover:bg-opacity-20`}>
-                <Icon size={22} className={`${color.replace('bg-', 'text-')}`} />
+    <div className="cool-card p-7 group transition-all duration-300 hover:translate-y-[-4px] hover:shadow-[0_20px_40px_rgba(0,0,0,0.06)] relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-indigo-500/5 to-transparent rounded-full -mr-16 -mt-16 transition-transform group-hover:scale-150 duration-700"></div>
+        <div className="flex justify-between items-start mb-6 relative">
+            <div className={`w-14 h-14 rounded-[1.25rem] ${color} bg-opacity-10 flex items-center justify-center transition-all duration-500 group-hover:scale-110 group-hover:bg-opacity-20`}>
+                <Icon size={24} className={`${color.replace('bg-', 'text-')}`} />
             </div>
             {trend && (
-                <div className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-bold uppercase tracking-wider">
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 text-[10px] font-black uppercase tracking-wider">
+                    <Zap size={10} className="fill-emerald-600" />
                     +{trend}%
                 </div>
             )}
         </div>
-        <div>
-            <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1">{title}</p>
-            <h3 className="text-3xl font-black text-slate-900 tracking-tight">{value ?? '—'}</h3>
-            {subtitle && <p className="text-xs text-slate-400 mt-1">{subtitle}</p>}
+        <div className="relative">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] mb-1.5">{title}</p>
+            <h3 className="text-4xl font-black text-slate-900 tracking-tight mb-2">{value ?? '—'}</h3>
+            {subtitle && (
+                <div className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-200"></span>
+                    <p className="text-[11px] font-bold text-slate-400 tracking-wide">{subtitle}</p>
+                </div>
+            )}
         </div>
     </div>
 );
@@ -63,8 +70,9 @@ const Dashboard = () => {
             data: [freeCount, busyCount, meetCount, leaveCount],
             backgroundColor: ['#10b981', '#f43f5e', '#f59e0b', '#94a3b8'],
             hoverOffset: 15,
-            borderWidth: 4,
-            borderColor: '#ffffff',
+            borderWidth: 0,
+            borderRadius: 8,
+            spacing: 5,
         }],
     };
 
@@ -72,7 +80,7 @@ const Dashboard = () => {
     stats?.taskStats?.forEach(s => { taskStatMap[s._id] = s.count; });
 
     const taskTrendData = {
-        labels: ['Assigned', 'Accepted', 'Progress', 'Done', 'Verified'],
+        labels: ['Queued', 'Planning', 'Active', 'Review', 'Signed'],
         datasets: [{
             label: 'Volume',
             data: [
@@ -82,76 +90,96 @@ const Dashboard = () => {
                 taskStatMap['Completed'] ?? 0,
                 taskStatMap['Verified'] ?? 0,
             ],
-            borderColor: '#6366f1',
-            backgroundColor: 'rgba(99, 102, 241, 0.1)',
-            tension: 0.5,
+            borderColor: '#0061FF',
+            borderWidth: 4,
+            backgroundColor: (context) => {
+                const bg = context.chart.ctx.createLinearGradient(0, 0, 0, 400);
+                bg.addColorStop(0, 'rgba(0, 97, 255, 0.1)');
+                bg.addColorStop(1, 'rgba(0, 97, 255, 0)');
+                return bg;
+            },
+            tension: 0.45,
             fill: true,
-            pointRadius: 4,
-            pointBackgroundColor: '#6366f1',
-            pointBorderColor: '#fff',
-            pointBorderWidth: 2,
+            pointRadius: 6,
+            pointHoverRadius: 9,
+            pointBackgroundColor: '#fff',
+            pointBorderColor: '#0061FF',
+            pointBorderWidth: 3,
         }],
     };
 
     if (loading) return (
-        <div className="flex flex-col justify-center items-center h-[calc(100vh-8rem)] gap-4">
-            <div className="w-12 h-12 border-4 border-slate-100 border-t-indigo-600 rounded-full animate-spin"></div>
-            <p className="text-slate-400 font-medium animate-pulse text-sm">Syncing latest data...</p>
+        <div className="flex flex-col justify-center items-center h-[calc(100vh-16rem)] gap-6">
+            <div className="relative">
+                <div className="w-16 h-16 border-[5px] border-slate-100 border-t-indigo-500 rounded-full animate-spin"></div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <Zap size={20} className="text-indigo-500 animate-pulse" />
+                </div>
+            </div>
+            <div className="text-center">
+                <p className="text-slate-900 font-black tracking-tight text-lg">Optimizing Workspace</p>
+                <p className="text-slate-400 font-bold uppercase tracking-[0.2em] text-[10px] mt-1">Downloading live metrics...</p>
+            </div>
         </div>
     );
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-700">
-            {/* ── Welcome Header ── */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">
-                        Hello, {user?.name?.split(' ')[0] || 'Admin'} <span className="text-indigo-600">.</span>
-                    </h1>
-                    <p className="text-slate-500 font-medium mt-1">Here's a snapshot of the campus operations today.</p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => navigate('/tasks')}
-                        className="group flex items-center gap-2 bg-slate-900 text-white px-5 py-2.5 rounded-2xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-200"
-                    >
-                        <Plus size={18} className="group-hover:rotate-90 transition-transform duration-300" />
-                        <span className="text-sm font-bold">New Task</span>
-                    </button>
-                    <div className="h-10 w-px bg-slate-200 mx-1 hidden md:block"></div>
-                    <div className="text-right hidden md:block">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Server Status</p>
-                        <div className="flex items-center gap-1.5 justify-end">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                            <span className="text-xs font-bold text-slate-700">Live</span>
-                        </div>
+        <div className="space-y-10 animate-fade-in pb-20">
+            {/* ── Welcome Banner (EdusoftX Style) ── */}
+            <div className="relative overflow-hidden rounded-[2.5rem] bg-gradient-to-r from-[#1e1b4b] via-[#312e81] to-[#4338ca] p-10 lg:p-14 text-white shadow-2xl shadow-indigo-200 group">
+                {/* Decorative blobs */}
+                <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-gradient-to-br from-blue-400/20 to-transparent rounded-full -mr-[200px] -mt-[200px] blur-[80px] group-hover:scale-110 transition-transform duration-1000"></div>
+                <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-gradient-to-tr from-indigo-500/10 to-transparent rounded-full -ml-[150px] -mb-[150px] blur-[60px]"></div>
+
+                <div className="relative z-10 flex flex-col lg:flex-row justify-between items-center gap-10">
+                    <div className="max-w-2xl text-center lg:text-left">
+                        <h1 className="text-4xl lg:text-5xl font-black tracking-tight leading-[1.1] mb-4">
+                            Dashboard Overview
+                        </h1>
+                        <p className="text-indigo-100/80 text-lg font-medium">
+                            Welcome back, <span className="text-white font-black underline decoration-blue-400 underline-offset-4">{user?.name || 'Administrator'}</span>! Here's what's happening in your campus today.
+                        </p>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-4 shrink-0">
+                        <button onClick={() => navigate('/reports')} className="flex items-center gap-3 bg-white/10 hover:bg-white/20 backdrop-blur-md px-6 py-4 rounded-2xl border border-white/10 transition-all font-black text-xs uppercase tracking-widest">
+                            <FileCheck size={18} />
+                            Generate Report
+                        </button>
+                        <button onClick={() => navigate('/tasks')} className="flex items-center gap-3 bg-blue-500 hover:bg-blue-400 px-8 py-4 rounded-2xl shadow-xl shadow-blue-500/20 transition-all font-black text-xs uppercase tracking-widest">
+                            <Plus size={18} className="stroke-[3px]" />
+                            Add Deployment
+                        </button>
                     </div>
                 </div>
             </div>
 
             {/* ── Stats Grid ── */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatsCard title="Total Staff" value={stats?.totalFaculty} icon={Users} color="bg-indigo-600" trend="12" subtitle="Personnel onboarded" />
-                <StatsCard title="Pending Tasks" value={stats?.activeTasks} icon={Target} color="bg-rose-600" trend="5" subtitle="Requires attention" />
-                <StatsCard title="Events Today" value={stats?.meetingsToday} icon={Zap} color="bg-amber-500" subtitle="Meetings & seminars" />
-                <StatsCard title="Resources" value="94%" icon={BookOpen} color="bg-emerald-600" subtitle="System utilization" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+                <StatsCard title="Total Students" value={stats?.totalFaculty} icon={Users} color="bg-blue-500" trend="12" subtitle="vs last month" />
+                <StatsCard title="Active Projects" value={stats?.activeTasks} icon={Target} color="bg-emerald-500" trend="5" subtitle="vs last month" />
+                <StatsCard title="Attendance Today" value="94.2%" icon={Clock} color="bg-rose-500" trend="2.1" subtitle="vs last month" />
+                <StatsCard title="Pending Fees" value="$48,500" icon={BookOpen} color="bg-slate-900" trend="-8" subtitle="vs last month" />
             </div>
 
-            {/* ── Main Layout ── */}
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-                {/* Task Analytics */}
-                <div className="xl:col-span-8 bg-white p-8 rounded-[2rem] border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
-                    <div className="flex justify-between items-center mb-8">
+            {/* ── Analytics Section ── */}
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 mt-12">
+                <div className="xl:col-span-8 cool-card p-10 group overflow-hidden relative">
+                    <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-gradient-to-bl from-indigo-50/20 to-transparent rounded-full -mr-[250px] -mt-[250px] pointer-events-none"></div>
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-10 relative">
                         <div>
-                            <h3 className="text-lg font-bold text-slate-900">Task Performance</h3>
-                            <p className="text-xs text-slate-400 mt-0.5">Flow of operations through different stages</p>
+                            <h3 className="text-2xl font-black text-slate-900 tracking-tight">Deployment flow</h3>
+                            <p className="text-sm font-bold text-slate-400 mt-1 uppercase tracking-widest">Real-time throughput metrics</p>
                         </div>
-                        <select className="bg-slate-50 border-none rounded-xl text-xs font-bold text-slate-600 focus:ring-0 px-3 py-2 cursor-pointer">
-                            <option>Last 7 Days</option>
-                            <option>Last 30 Days</option>
-                        </select>
+                        <div className="flex bg-slate-50 p-1 rounded-2xl border border-slate-100">
+                            {['7 Days', '30 Days'].map((period, i) => (
+                                <button key={i} className={`px-5 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${i === 0 ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}>
+                                    {period}
+                                </button>
+                            ))}
+                        </div>
                     </div>
-                    <div className="h-[280px]">
+                    <div className="h-[320px] relative">
                         <Line
                             data={taskTrendData}
                             options={{
@@ -159,96 +187,98 @@ const Dashboard = () => {
                                 responsive: true,
                                 plugins: { legend: { display: false } },
                                 scales: {
-                                    y: { grid: { display: false }, border: { display: false }, ticks: { font: { weight: 'bold' }, color: '#cbd5e1' } },
-                                    x: { grid: { display: false }, border: { display: false }, ticks: { font: { weight: 'bold' }, color: '#94a3b8' } }
+                                    y: {
+                                        grid: { color: '#f1f5f9', borderDash: [5, 5] },
+                                        border: { display: false },
+                                        ticks: { font: { weight: 'bold', size: 11 }, color: '#94a3b8', padding: 10 }
+                                    },
+                                    x: {
+                                        grid: { display: false },
+                                        border: { display: false },
+                                        ticks: { font: { weight: 'bold', size: 10 }, color: '#94a3b8', padding: 10 }
+                                    }
                                 }
                             }}
                         />
                     </div>
                 </div>
 
-                {/* Faculty Status & Quick Stats */}
-                <div className="xl:col-span-4 space-y-6">
-                    <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)]">
-                        <h3 className="text-lg font-bold text-slate-900 mb-6">Staff Availability</h3>
-                        <div className="relative h-56 flex items-center justify-center">
+                <div className="xl:col-span-4 space-y-8">
+                    <div className="cool-card p-10 relative overflow-hidden h-full">
+                        <h3 className="text-xl font-black text-slate-900 tracking-tight mb-8">Staff Utilization</h3>
+                        <div className="relative h-64 w-full flex items-center justify-center">
                             <Doughnut
                                 data={availabilityData}
                                 options={{
                                     maintainAspectRatio: false,
-                                    cutout: '75%',
-                                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 8, padding: 20, font: { size: 10, weight: 'bold' }, usePointStyle: true } } }
+                                    cutout: '82%',
+                                    plugins: {
+                                        legend: {
+                                            position: 'bottom',
+                                            labels: {
+                                                boxWidth: 6,
+                                                padding: 25,
+                                                font: { size: 10, weight: 800 },
+                                                usePointStyle: true,
+                                                color: '#64748b'
+                                            }
+                                        }
+                                    }
                                 }}
                             />
-                            <div className="absolute inset-x-0 top-[40%] text-center pointer-events-none">
-                                <span className="block text-2xl font-black text-slate-900 leading-none">{stats?.totalFaculty || 0}</span>
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total</span>
+                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-[-20px]">
+                                <span className="block text-4xl font-black text-slate-900 tracking-tight leading-none">{stats?.totalFaculty || 0}</span>
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-2">Active</span>
                             </div>
                         </div>
-                    </div>
 
-                    {/* Quick Link/Action */}
-                    <div className="bg-gradient-to-br from-indigo-600 to-blue-700 p-6 rounded-[2rem] text-white overflow-hidden relative group cursor-pointer" onClick={() => navigate('/reports')}>
-                        <div className="relative z-10 flex justify-between items-center">
+                        <div className="mt-8 pt-8 border-t border-slate-50 flex justify-between items-center group cursor-pointer" onClick={() => navigate('/reports')}>
                             <div>
-                                <h4 className="font-bold text-lg leading-tight">Generate<br />Reports</h4>
-                                <p className="text-indigo-100 text-[10px] mt-1 font-medium bg-white/20 w-fit px-2 py-0.5 rounded-full">Monthly Audit Ready</p>
+                                <h4 className="font-black text-slate-900 text-sm">Automated Audit</h4>
+                                <p className="text-[11px] font-bold text-slate-400 mt-0.5">Generate daily PDF insights</p>
                             </div>
-                            <div className="bg-white/20 p-3 rounded-2xl group-hover:px-5 transition-all">
-                                <ArrowRight size={20} />
+                            <div className="w-10 h-10 rounded-xl bg-slate-900 text-white flex items-center justify-center transition-transform group-hover:translate-x-1">
+                                <ArrowRight size={18} />
                             </div>
-                        </div>
-                        <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
-                            <FileCheck size={120} />
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* ── Footer / Secondary Grid ── */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-4">
-                <div className="bg-white p-6 rounded-3xl border border-gray-100">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-bold text-slate-800">Quick Actions</h3>
-                        <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full uppercase tracking-tighter">Admin Tools</span>
+            {/* ── Footer ── */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch mt-4">
+                <div className="lg:col-span-5 cool-card p-8 flex flex-col justify-center bg-gradient-to-br from-slate-900 to-slate-800 text-white border-none shadow-2xl shadow-indigo-100">
+                    <div className="flex justify-between items-start mb-6">
+                        <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-md">
+                            <Settings size={22} className="text-indigo-300" />
+                        </div>
+                        <span className="text-[10px] font-black bg-indigo-500/20 text-indigo-300 px-3 py-1.5 rounded-full uppercase tracking-widest border border-indigo-500/30">System v2.4</span>
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        {[
-                            { label: 'Schedule', icon: Clock, path: '/schedule', color: 'text-blue-600', bg: 'bg-blue-50' },
-                            { label: 'Chat', icon: MessageSquare, path: '/chat', color: 'text-purple-600', bg: 'bg-purple-50' },
-                            { label: 'Faculty', icon: Users, path: '/faculty', color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                            { label: 'Settings', icon: Settings, path: '/settings', color: 'text-rose-600', bg: 'bg-rose-50' },
-                        ].map((btn, i) => (
-                            <button
-                                key={i}
-                                onClick={() => navigate(btn.path)}
-                                className="flex flex-col items-center justify-center gap-2 p-4 rounded-2xl border border-slate-50 hover:border-slate-100 hover:bg-slate-50/50 transition-all group"
-                            >
-                                <div className={`p-2.5 rounded-xl ${btn.bg} ${btn.color} group-hover:scale-110 transition-transform`}>
-                                    <btn.icon size={20} />
-                                </div>
-                                <span className="text-[11px] font-bold text-slate-600">{btn.label}</span>
-                            </button>
-                        ))}
-                    </div>
+                    <h3 className="text-2xl font-black tracking-tight mb-2 uppercase">Integrity Check</h3>
+                    <p className="text-slate-400 text-sm font-medium mb-8 leading-relaxed">All sub-modules are responding within normal parameters. Next system backup scheduled in 4 hours.</p>
+                    <button className="w-fit text-[11px] font-black uppercase tracking-[0.2em] text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-2 group">
+                        Run Hardware Diagnostic
+                        <Plus size={14} className="group-hover:rotate-90 transition-transform duration-300" />
+                    </button>
                 </div>
 
-                <div className="bg-white p-6 rounded-3xl border border-gray-100">
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-bold text-slate-800">System Logs</h3>
-                        <button onClick={() => navigate('/notifications')} className="text-xs font-bold text-slate-400 hover:text-slate-900 transition-colors">View All</button>
+                <div className="lg:col-span-7 cool-card p-8 relative overflow-hidden bg-white">
+                    <div className="flex justify-between items-center mb-8 relative z-10">
+                        <h3 className="text-lg font-black text-slate-900 uppercase tracking-widest">Audit Logs</h3>
+                        <button onClick={() => navigate('/notifications')} className="text-[11px] font-black text-slate-400 hover:text-slate-900 transition-colors uppercase tracking-widest">Archive</button>
                     </div>
-                    <div className="space-y-3">
+                    <div className="space-y-4 relative z-10">
                         {[
-                            { text: 'Server successfully synchronized with cloud database', time: '2m ago', type: 'success' },
-                            { text: 'Meeting scheduler finalized for Computer Dept.', time: '1h ago', type: 'info' }
+                            { text: 'Core engine synchronized with master branch', time: '12m ago', type: 'success' },
+                            { text: 'New faculty onboarded: Dr. Sarah Connor', time: '4h ago', type: 'info' },
+                            { text: 'Emergency task assigned to IT Department', time: '6h ago', type: 'warning' }
                         ].map((log, i) => (
-                            <div key={i} className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-100">
-                                <div className="flex items-center gap-3">
-                                    <div className={`w-1.5 h-1.5 rounded-full ${log.type === 'success' ? 'bg-emerald-500' : 'bg-blue-500'}`} />
-                                    <p className="text-[11px] font-medium text-slate-600">{log.text}</p>
+                            <div key={i} className="flex items-center justify-between p-4 rounded-2xl bg-slate-50/50 border border-slate-100/50 hover:bg-white hover:shadow-lg hover:shadow-slate-100 transition-all cursor-default">
+                                <div className="flex items-center gap-4">
+                                    <div className={`w-2 h-2 rounded-full ${log.type === 'success' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : log.type === 'warning' ? 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]' : 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]'}`} />
+                                    <p className="text-xs font-bold text-slate-700">{log.text}</p>
                                 </div>
-                                <span className="text-[10px] font-bold text-slate-400 shrink-0">{log.time}</span>
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0 ml-4">{log.time}</span>
                             </div>
                         ))}
                     </div>

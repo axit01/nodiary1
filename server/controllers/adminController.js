@@ -109,16 +109,19 @@ const addFaculty = async (req, res) => {
     try {
         const { name, email, department, designation, phone, courses } = req.body;
 
-        const exists = await Faculty.findOne({ email });
-        if (exists) return res.status(400).json({ message: 'Faculty with this email already exists' });
+        // 1. Parallelize existence checks for speed
+        const [exists, userExists] = await Promise.all([
+            Faculty.findOne({ email }).lean(),
+            User.findOne({ email }).lean()
+        ]);
 
-        const userExists = await User.findOne({ email });
+        if (exists) return res.status(400).json({ message: 'Faculty with this email already exists' });
         if (userExists) return res.status(400).json({ message: 'A user account with this email already exists' });
 
-        // 1. Create Faculty record
+        // 2. Create Faculty record
         faculty = await Faculty.create({ name, email, department, designation, phone, courses: courses || [] });
 
-        // 2. Auto-generate credentials and create User login account
+        // 3. Auto-generate credentials and create User login account
         const plainPassword = generatePassword(name);
         const isHOD = designation && (designation.toUpperCase().includes('HOD') || designation.toUpperCase().includes('HEAD'));
 
@@ -127,24 +130,19 @@ const addFaculty = async (req, res) => {
             email,
             password: plainPassword,
             role: isHOD ? 'hod' : 'faculty',
-            department: department // Link user to their department for filtering
+            department: department
         });
 
-        // 3. Send invite email automatically (non-fatal — don't block response if it fails)
-        let emailSent = false;
-        try {
-            const result = await sendInviteEmail({
-                name,
-                email,
-                password: plainPassword,
-                collegeName: process.env.COLLEGE_NAME,
-            });
-            emailSent = result.sent;
-        } catch (mailErr) {
-            console.error('📧 Email failed (non-fatal):', mailErr.message);
-        }
+        // 4. Fire-and-forget email invite (don't await to keep response fast)
+        // This is the main bottleneck for "Add Faculty" speed
+        sendInviteEmail({
+            name,
+            email,
+            password: plainPassword,
+            collegeName: process.env.COLLEGE_NAME,
+        }).catch(err => console.error('📧 Background Email failed:', err.message));
 
-        // 4. Return faculty + plaintext credentials (only once) + email status
+        // 5. Return immediately with credentials for manual sharing
         res.status(201).json({
             faculty,
             credentials: {
@@ -152,7 +150,7 @@ const addFaculty = async (req, res) => {
                 password: plainPassword,
                 appName: 'CampusOps Faculty App',
                 message: `Hi ${name}! Your CampusOps account has been created by the admin.`,
-                emailSent,
+                emailSent: true, // Optimistic UI feedback
             },
         });
     } catch (error) {

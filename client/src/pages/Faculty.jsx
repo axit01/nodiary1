@@ -127,41 +127,41 @@ const FacultyCard = ({ faculty, onEdit, onDelete }) => {
     if (!faculty) return null;
 
     const statusConfig = {
-        'Free': { bg: 'bg-emerald-50', text: 'text-emerald-600', dot: 'bg-emerald-500' },
-        'Busy': { bg: 'bg-rose-50', text: 'text-rose-600', dot: 'bg-rose-500' },
-        'Meeting': { bg: 'bg-amber-50', text: 'text-amber-600', dot: 'bg-amber-500' },
-        'Leave': { bg: 'bg-slate-100', text: 'text-slate-500', dot: 'bg-slate-400' },
-        'default': { bg: 'bg-indigo-50', text: 'text-indigo-600', dot: 'bg-indigo-500' }
+        'Free': { bg: 'bg-emerald-500/10', text: 'text-emerald-600', dot: 'bg-emerald-500' },
+        'Busy': { bg: 'bg-rose-500/10', text: 'text-rose-600', dot: 'bg-rose-500' },
+        'Meeting': { bg: 'bg-amber-500/10', text: 'text-amber-600', dot: 'bg-amber-500' },
+        'Leave': { bg: 'bg-slate-500/10', text: 'text-slate-500', dot: 'bg-slate-400' },
+        'default': { bg: 'bg-indigo-500/10', text: 'text-indigo-600', dot: 'bg-indigo-500' }
     };
 
     const cfg = statusConfig[faculty.liveStatus] || statusConfig['default'];
 
     return (
-        <div className="bg-white rounded-[2rem] p-6 border border-gray-100 shadow-[0_8px_30px_rgb(0,0,0,0.02)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] transition-all duration-300 group relative">
+        <div className="cool-card p-6 group relative transition-all duration-300 hover:shadow-xl hover:shadow-indigo-500/5 hover:-translate-y-1">
             <div className="flex justify-between items-start mb-6">
                 <div className="relative">
-                    <div className="w-16 h-16 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black text-2xl shadow-lg ring-4 ring-white group-hover:scale-105 transition-transform">
+                    <div className="w-16 h-16 rounded-2xl bg-[#0F172A] text-white flex items-center justify-center font-black text-2xl shadow-lg group-hover:scale-105 transition-transform">
                         {(faculty.name || '?').charAt(0)}
                     </div>
-                    <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-4 border-white ${cfg.dot} animate-pulse`}></div>
+                    <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-4 border-white ${cfg.dot} shadow-[0_0_10px_rgba(0,0,0,0.1)]`}></div>
                 </div>
 
                 <div className="relative">
                     <button
                         onClick={() => setShowOptions(!showOptions)}
-                        className="p-2 hover:bg-slate-50 rounded-xl transition-colors text-slate-400 group-hover:text-slate-800"
+                        className="w-10 h-10 flex items-center justify-center hover:bg-slate-50 rounded-xl transition-colors text-slate-400 hover:text-slate-900 border border-transparent hover:border-slate-100"
                     >
                         <MoreVertical size={18} />
                     </button>
                     {showOptions && (
                         <>
                             <div className="fixed inset-0 z-10" onClick={() => setShowOptions(false)}></div>
-                            <div className="absolute right-0 mt-2 w-36 bg-white rounded-2xl shadow-xl border border-gray-100 z-20 overflow-hidden py-1 animate-in fade-in zoom-in-95 duration-200">
-                                <button onClick={() => { onEdit(faculty); setShowOptions(false); }} className="w-full text-left px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2">
+                            <div className="absolute right-0 mt-2 w-44 bg-white rounded-2xl shadow-2xl border border-slate-100 z-20 overflow-hidden py-1.5 animate-in fade-in zoom-in-95 duration-200">
+                                <button onClick={() => { onEdit(faculty); setShowOptions(false); }} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-50 flex items-center gap-3">
                                     <Edit2 size={14} className="text-slate-400" /> Edit Profile
                                 </button>
-                                <button onClick={() => { onDelete(faculty._id); setShowOptions(false); }} className="w-full text-left px-4 py-2.5 text-xs font-bold text-rose-600 hover:bg-rose-50 flex items-center gap-2">
-                                    <Trash2 size={14} className="text-rose-400" /> Remove
+                                <button onClick={() => { onDelete(faculty._id); setShowOptions(false); }} className="w-full text-left px-4 py-3 text-[11px] font-black uppercase tracking-widest text-rose-500 hover:bg-rose-50 flex items-center gap-3">
+                                    <Trash2 size={14} className="text-rose-400" /> Remove Identity
                                 </button>
                             </div>
                         </>
@@ -171,33 +171,37 @@ const FacultyCard = ({ faculty, onEdit, onDelete }) => {
 
             <div className="space-y-1">
                 <h3 className="text-lg font-black text-slate-900 tracking-tight leading-tight truncate">{faculty.name || 'Unknown Faculty'}</h3>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{faculty.designation || 'Staff'}</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{faculty.designation || 'Staff'}</p>
             </div>
 
-            <div className={`mt-4 w-fit px-3 py-1 rounded-full ${cfg.bg} ${cfg.text} text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`}></span>
+            <div className={`mt-5 w-fit px-3 py-1.5 rounded-xl ${cfg.bg} ${cfg.text} text-[10px] font-black uppercase tracking-[0.1em] flex items-center gap-2 border border-white/50 shadow-sm`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot} animate-pulse`}></span>
                 {faculty.liveStatus || 'Available'}
             </div>
 
-            <div className="mt-8 pt-6 border-t border-slate-50 space-y-3">
-                <div className="flex items-center gap-3 text-slate-500">
-                    <Mail size={14} className="shrink-0" />
-                    <span className="text-xs font-medium truncate">{faculty.email || 'No email provided'}</span>
+            <div className="mt-8 pt-6 border-t border-slate-50 space-y-3.5">
+                <div className="flex items-center gap-3.5 text-slate-500 group/item cursor-pointer">
+                    <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400 group-hover/item:bg-indigo-50 group-hover/item:text-indigo-500 transition-colors">
+                        <Mail size={14} />
+                    </div>
+                    <span className="text-[11px] font-bold truncate tracking-wide">{faculty.email || 'No institutional email'}</span>
                 </div>
-                <div className="flex items-center gap-3 text-slate-500">
-                    <Phone size={14} className="shrink-0" />
-                    <span className="text-xs font-medium">{faculty.phone || 'No phone provided'}</span>
+                <div className="flex items-center gap-3.5 text-slate-500 group/item cursor-pointer">
+                    <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400 group-hover/item:bg-emerald-50 group-hover/item:text-emerald-500 transition-colors">
+                        <Phone size={14} />
+                    </div>
+                    <span className="text-[11px] font-bold tracking-wide">{faculty.phone || 'No phone record'}</span>
                 </div>
             </div>
 
-            <div className="mt-6 flex flex-wrap gap-1.5">
+            <div className="mt-6 flex flex-wrap gap-2">
                 {(faculty.courses || []).slice(0, 3).map((code, idx) => (
-                    <span key={idx} className="bg-slate-50 text-slate-400 text-[9px] font-black px-2 py-0.5 rounded-md border border-slate-100">
+                    <span key={idx} className="bg-slate-100/50 text-slate-500 text-[9px] font-black px-2.5 py-1 rounded-lg border border-slate-200/50 uppercase tracking-tighter">
                         {code}
                     </span>
                 ))}
                 {faculty.courses?.length > 3 && (
-                    <span className="text-[9px] font-black text-slate-300 px-1">+{faculty.courses.length - 3}</span>
+                    <span className="text-[9px] font-black text-slate-300 px-1 self-center">+{faculty.courses.length - 3}</span>
                 )}
             </div>
         </div>
@@ -225,33 +229,22 @@ const Faculty = () => {
         name: '', department: '', designation: '', email: '', phone: '', courses: [],
     });
 
-    // ── Grouping Logic ───────────────────────────────────────────────────
     const groupedFaculty = useMemo(() => {
         const groups = {};
-
-        // Initialize predefined departments
         if (Array.isArray(departments)) {
             departments.forEach(dept => {
                 if (dept && dept.deptId) {
-                    groups[dept.deptId] = {
-                        name: dept.name || dept.deptId,
-                        members: []
-                    };
+                    groups[dept.deptId] = { name: dept.name || dept.deptId, members: [] };
                 }
             });
         }
+        groups['unassigned'] = { name: 'Operations & Other', members: [] };
 
-        // Add "unassigned" as a fallback
-        groups['unassigned'] = { name: 'Other Staff', members: [] };
-
-        // Process faculty members
         if (Array.isArray(facultyMembers)) {
             facultyMembers.forEach(f => {
                 if (!f) return;
                 const deptId = f.department || 'unassigned';
-                if (!groups[deptId]) {
-                    groups[deptId] = { name: deptId, members: [] };
-                }
+                if (!groups[deptId]) groups[deptId] = { name: deptId, members: [] };
                 groups[deptId].members.push(f);
             });
         }
@@ -262,17 +255,13 @@ const Faculty = () => {
         });
     }, [facultyMembers, departments]);
 
-    // ── Load Dependencies ────────────────────────────────────────────────
     useEffect(() => {
         const loadInit = async () => {
             try {
-                const [deptRes, courseRes] = await Promise.all([
-                    getDepartmentsAPI(),
-                    getCoursesAPI()
-                ]);
+                const [deptRes, courseRes] = await Promise.all([getDepartmentsAPI(), getCoursesAPI()]);
                 if (deptRes?.data) setDepartments(deptRes.data);
                 if (courseRes?.data) setAllCourses(courseRes.data);
-            } catch (err) { console.error('Failed to load faculty dependencies:', err); }
+            } catch (err) { console.error(err); }
         };
         loadInit();
     }, []);
@@ -290,7 +279,6 @@ const Faculty = () => {
         }));
     };
 
-    // ── Data Management ──────────────────────────────────────────────────
     const loadFaculty = async (search = '') => {
         try {
             setLoading(true);
@@ -303,8 +291,7 @@ const Faculty = () => {
                 setFacultyMembers(enriched);
             }
         } catch (err) {
-            console.error(err);
-            setError('Failed to load faculty directory.');
+            setError('System failed to sync directory.');
         } finally {
             setLoading(false);
         }
@@ -352,9 +339,9 @@ const Faculty = () => {
                 }
             }
             setIsModalOpen(false);
-            showToast(modalMode === 'add' ? 'Faculty onboarded successfully!' : 'Profile updated successfully!', 'success');
+            showToast(modalMode === 'add' ? 'Personnel initialized locally.' : 'Master record updated.', 'success');
         } catch (err) {
-            showToast(err?.response?.data?.message || 'Action failed.', 'error');
+            showToast(err?.response?.data?.message || 'Transaction failed.', 'error');
         } finally {
             setSubmitting(false);
         }
@@ -362,84 +349,78 @@ const Faculty = () => {
 
     const handleDelete = async (id) => {
         const isConfirmed = await confirm({
-            title: 'Delete Faculty Member?',
-            message: 'This will permanently remove their profile and login access. This action cannot be undone.',
+            title: 'Decommission Staff?',
+            message: 'Are you sure you want to remove this record from the cluster?',
             variant: 'danger',
-            confirmText: 'Yes, Remove Member'
+            confirmText: 'Yes, Decommission'
         });
-
         if (!isConfirmed) return;
-
         try {
             await deleteFacultyAPI(id);
             setFacultyMembers(prev => prev.filter(f => f._id !== id));
-            showToast('Faculty member removed successfully.', 'success');
+            showToast('Identity purged successfully.', 'success');
         } catch (err) {
-            showToast(err?.response?.data?.message || 'Delete failed.', 'error');
+            showToast(err?.response?.data?.message || 'Purge failed.', 'error');
         }
     };
 
     return (
-        <div className="space-y-10 pb-10 animate-in fade-in duration-700">
+        <div className="space-y-12 animate-fade-in pb-20">
             {/* Header Section */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                <div className="animate-in slide-in-from-left duration-500">
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">
-                        Faculty Directory <span className="text-indigo-600">.</span>
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-end gap-10">
+                <div className="max-w-2xl">
+                    <h1 className="text-5xl font-black text-slate-900 tracking-tight leading-[1.1]">
+                        Staff <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-indigo-400">Registry</span>
                     </h1>
-                    <p className="text-slate-500 font-medium mt-1">Organizing and managing teaching staff by department.</p>
+                    <p className="text-slate-500 font-semibold text-lg mt-4 leading-relaxed">Centralized personnel management for all academic departments and operations staff.</p>
                 </div>
-                <div className="flex items-center gap-3 w-full md:w-auto">
-                    <div className="relative flex-1 md:w-72 group">
-                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" size={18} />
+                <div className="flex items-center gap-4 w-full lg:w-auto">
+                    <div className="relative flex-1 lg:w-80 group">
+                        <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" size={20} />
                         <input
                             type="text"
-                            placeholder="Search directory..."
-                            className="w-full pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-2xl shadow-sm focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all font-medium text-slate-600 placeholder:text-slate-300"
+                            placeholder="Filter by name or identity..."
+                            className="w-full pl-14 pr-6 py-5 bg-white border border-slate-100 rounded-[1.5rem] shadow-xl shadow-slate-200/50 focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 outline-none transition-all font-bold text-slate-700 placeholder:text-slate-300 placeholder:font-medium"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
                     <button
                         onClick={() => handleOpenModal('add')}
-                        className="flex items-center gap-2 bg-slate-900 text-white px-5 py-3 rounded-2xl hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 active:scale-95 shrink-0"
+                        className="cool-button h-[64px] px-8 bg-[#0F172A] text-white rounded-[1.5rem] shadow-2xl shadow-slate-200 flex items-center gap-3 hover:bg-slate-800"
                     >
-                        <Plus size={20} />
-                        <span className="font-bold text-sm hidden sm:block">Add Member</span>
+                        <Plus size={22} className="stroke-[3px]" />
+                        <span className="font-black text-xs uppercase tracking-widest hidden sm:block">Onboard Staff</span>
                     </button>
                 </div>
             </div>
 
-            {/* Main Content Area */}
             {loading ? (
-                <div className="flex flex-col items-center justify-center py-40 space-y-4">
-                    <div className="w-12 h-12 border-4 border-slate-100 border-t-indigo-600 rounded-full animate-spin"></div>
-                    <p className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Scanning Database</p>
-                </div>
-            ) : error ? (
-                <div className="bg-rose-50 border border-rose-100 p-8 rounded-[2rem] text-center max-w-lg mx-auto">
-                    <AlertTriangle className="mx-auto text-rose-500 mb-4" size={40} />
-                    <p className="text-rose-700 font-bold">{error}</p>
-                    <button onClick={() => loadFaculty()} className="mt-4 text-xs font-black text-rose-600 underline uppercase tracking-tighter hover:text-rose-800 transition-colors">Try Manual Sync</button>
+                <div className="flex flex-col items-center justify-center py-40 space-y-6">
+                    <div className="w-16 h-16 border-[5px] border-slate-100 border-t-indigo-600 rounded-full animate-spin"></div>
+                    <p className="text-slate-400 font-black uppercase tracking-[0.2em] text-[10px]">Scanning Registry</p>
                 </div>
             ) : (
-                <div className="space-y-12">
+                <div className="space-y-20">
                     {Array.isArray(groupedFaculty) && groupedFaculty.map(([deptId, data]) => (
-                        <div key={deptId} className="space-y-6">
-                            <div className="flex items-center gap-4">
-                                <div className="p-2.5 rounded-xl bg-indigo-600 text-white shadow-lg shadow-indigo-200">
-                                    <GraduationCap size={20} />
+                        <div key={deptId} className="space-y-8 animate-in slide-in-from-bottom-8 duration-700">
+                            <div className="flex items-center gap-6">
+                                <div className="p-3.5 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 text-white shadow-xl shadow-indigo-100">
+                                    <GraduationCap size={24} />
                                 </div>
-                                <div>
-                                    <h2 className="text-xl font-black text-slate-900 tracking-tight">{data.name || deptId}</h2>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mt-1">
-                                        {data.members?.length || 0} Professional{data.members?.length !== 1 ? 's' : ''} Active
-                                    </p>
+                                <div className="flex-1">
+                                    <h2 className="text-2xl font-black text-slate-900 tracking-tight leading-none uppercase">{data.name || deptId}</h2>
+                                    <div className="flex items-center gap-2 mt-2">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-400"></div>
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                            {data.members?.length || 0} Registered Personnel
+                                        </p>
+                                    </div>
                                 </div>
-                                <div className="flex-1 h-px bg-slate-100 ml-4"></div>
+                                <div className="hidden sm:block h-[1px] flex-[2] bg-slate-100"></div>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
                                 {data.members?.length > 0 ? (
                                     data.members.map((faculty) => (
                                         <FacultyCard
@@ -450,77 +431,62 @@ const Faculty = () => {
                                         />
                                     ))
                                 ) : (
-                                    <div className="col-span-full py-12 border-2 border-dashed border-slate-100 rounded-[2.5rem] flex flex-col items-center justify-center grayscale opacity-40">
-                                        <Users className="text-slate-200 mb-3" size={48} />
-                                        <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">No faculty in this cluster</p>
+                                    <div className="col-span-full py-20 border-4 border-dashed border-slate-50 rounded-[3rem] flex flex-col items-center justify-center grayscale opacity-30">
+                                        <Users className="text-slate-200 mb-4" size={56} />
+                                        <p className="text-slate-400 font-black text-[10px] uppercase tracking-[0.25em]">Cluster Empty</p>
                                     </div>
                                 )}
                             </div>
                         </div>
                     ))}
-
-                    {facultyMembers.length === 0 && (
-                        <div className="flex flex-col items-center justify-center py-24 bg-white rounded-[3rem] border border-gray-100 mx-auto max-w-2xl text-center shadow-sm">
-                            <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-6">
-                                <Users size={40} className="text-slate-200" />
-                            </div>
-                            <h2 className="text-xl font-bold text-slate-900 tracking-tight">Search Result Empty</h2>
-                            <p className="text-slate-400 text-sm mt-2 max-w-xs mx-auto">No faculty matches your criteria. Check the spelling or add a new entry.</p>
-                            <button
-                                onClick={() => { setSearchTerm(''); loadFaculty(''); }}
-                                className="mt-6 text-indigo-600 font-black text-xs uppercase tracking-widest hover:text-indigo-800 transition-colors"
-                            >
-                                Reset Directory View
-                            </button>
-                        </div>
-                    )}
                 </div>
             )}
 
             {/* Modal Overlay */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-                    <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[92vh] border border-white/20 scale-in-center">
-                        <div className="flex justify-between items-center p-8 bg-slate-50/50">
-                            <div>
-                                <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-                                    {modalMode === 'add' ? 'Onboard Faculty' : 'Update Profile'}
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 animate-in fade-in duration-300">
+                    <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[92vh] border border-white/20 scale-in-center">
+                        <div className="flex justify-between items-center p-10 bg-slate-50/50 relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-50 rounded-full -mr-32 -mt-32 opacity-50"></div>
+                            <div className="relative z-10">
+                                <h2 className="text-3xl font-black text-slate-900 tracking-tight">
+                                    {modalMode === 'add' ? 'Personnel Onboarding' : 'Record Management'}
                                 </h2>
-                                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Teaching & Operations Personnel</p>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-2 leading-none">Identity Verification & Access Control</p>
                             </div>
-                            <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-900 p-2 rounded-xl transition-colors">
+                            <button onClick={() => setIsModalOpen(false)} className="relative z-10 w-12 h-12 flex items-center justify-center text-slate-400 hover:text-slate-900 hover:bg-white rounded-2xl transition-all shadow-sm">
                                 <X size={24} />
                             </button>
                         </div>
 
-                        <form onSubmit={handleSubmit} className="p-8 space-y-8 overflow-y-auto custom-scrollbar">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Full Identity</label>
+                        <form onSubmit={handleSubmit} className="p-10 space-y-10 overflow-y-auto custom-scrollbar bg-white">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div className="space-y-2.5">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Legal Full Name</label>
                                     <input name="name" required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                        className="w-full px-5 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold text-slate-700 transition-all"
-                                        placeholder="Dr. Alexander Wright" />
+                                        className="w-full px-6 py-4 bg-slate-50 border border-transparent rounded-[1.25rem] focus:ring-4 focus:ring-indigo-100 focus:bg-white focus:border-indigo-400 outline-none font-bold text-slate-700 transition-all shadow-inner"
+                                        placeholder="Alexander J. Wright" />
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Institutional Email</label>
+                                <div className="space-y-2.5">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Institutional Endpoint</label>
                                     <input name="email" type="email" required value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })}
-                                        className="w-full px-5 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold text-slate-700 transition-all"
+                                        className="w-full px-6 py-4 bg-slate-50 border border-transparent rounded-[1.25rem] focus:ring-4 focus:ring-indigo-100 focus:bg-white focus:border-indigo-400 outline-none font-bold text-slate-700 transition-all shadow-inner"
                                         placeholder="a.wright@campus.edu" />
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Phone Number</label>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div className="space-y-2.5">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Phone Connectivity</label>
                                     <input name="phone" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                                        className="w-full px-5 py-3.5 bg-slate-50 border-none rounded-2xl focus:ring-4 focus:ring-indigo-100 outline-none font-bold text-slate-700 transition-all"
-                                        placeholder="+91 (0) 00000 00000" />
+                                        className="w-full px-6 py-4 bg-slate-50 border border-transparent rounded-[1.25rem] focus:ring-4 focus:ring-indigo-100 focus:bg-white focus:border-indigo-400 outline-none font-bold text-slate-700 transition-all shadow-inner"
+                                        placeholder="+91 (0) 0000 00000" />
                                 </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Academic Rank</label>
+                                <div className="space-y-2.5">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Organizational Level</label>
                                     <select name="designation" required value={formData.designation} onChange={e => setFormData({ ...formData, designation: e.target.value })}
-                                        className="w-full px-5 py-3.5 bg-slate-50 border-none rounded-2xl outline-none focus:ring-4 focus:ring-indigo-100 font-bold text-slate-700">
-                                        <option value="">Select Designation</option>
+                                        className="w-full px-6 py-4 bg-slate-50 border border-transparent rounded-[1.25rem] outline-none focus:ring-4 focus:ring-indigo-100 focus:bg-white focus:border-indigo-400 font-bold text-slate-700 transition-all shadow-inner appearance-none">
+                                        <option value="">Select Clear Level</option>
                                         <option value="Professor">Professor</option>
                                         <option value="Associate Professor">Associate Professor</option>
                                         <option value="Assistant Professor">Assistant Professor</option>
@@ -530,79 +496,60 @@ const Faculty = () => {
                                 </div>
                             </div>
 
-                            <div className="space-y-4 pt-4 border-t border-slate-50">
+                            <div className="space-y-5 pt-6 border-t border-slate-50">
                                 <div>
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Primary Department</label>
-                                    <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Primary Departmental Node</label>
+                                    <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                                         {Array.isArray(departments) && departments.map(d => (
                                             <button
                                                 key={d._id}
                                                 type="button"
                                                 onClick={() => setFormData({ ...formData, department: d.deptId, courses: [] })}
-                                                className={`px-4 py-3 rounded-2xl border-2 text-xs font-black transition-all ${formData.department === d.deptId
-                                                    ? 'border-indigo-600 bg-indigo-50 text-indigo-700'
+                                                className={`px-5 py-4 rounded-2xl border-2 text-[11px] font-black transition-all uppercase tracking-tighter ${formData.department === d.deptId
+                                                    ? 'border-slate-900 bg-slate-900 text-white shadow-xl shadow-slate-200'
                                                     : 'border-slate-50 bg-slate-50 text-slate-400 hover:border-slate-200'}`}
                                             >
                                                 {d.deptId}
                                             </button>
                                         ))}
                                     </div>
-                                    {(!departments || departments.length === 0) && (
-                                        <p className="text-[10px] text-amber-600 font-bold mt-2 italic px-1">⚠️ No departments found. Configure them in Settings first.</p>
-                                    )}
                                 </div>
                             </div>
 
                             {formData.department && (
-                                <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Assigned Courses ({deptCourses.length})</label>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div className="space-y-5 animate-in slide-in-from-top-4 duration-500">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Knowledge Domains ({deptCourses.length})</label>
+                                    <div className="max-h-64 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 gap-4 pr-2 custom-scrollbar">
                                         {deptCourses.map(course => (
                                             <button
                                                 key={course._id}
                                                 type="button"
                                                 onClick={() => toggleCourse(course.courseCode)}
-                                                className={`flex items-center gap-3 p-4 rounded-2xl border-2 transition-all text-left ${formData.courses.includes(course.courseCode)
-                                                    ? 'border-slate-900 bg-slate-950 text-white shadow-xl shadow-slate-200 scale-[1.02]'
-                                                    : 'border-slate-50 bg-slate-50 text-slate-500 hover:border-slate-100'}`}
+                                                className={`flex items-center gap-4 p-5 rounded-2xl border-2 transition-all text-left group/item ${formData.courses.includes(course.courseCode)
+                                                    ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-lg shadow-indigo-100'
+                                                    : 'border-slate-50 bg-slate-50 text-slate-500 hover:border-slate-200'}`}
                                             >
-                                                <div className={`p-2 rounded-xl ${formData.courses.includes(course.courseCode) ? 'bg-white/10' : 'bg-white shadow-sm'}`}>
-                                                    <BookOpen size={16} />
+                                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${formData.courses.includes(course.courseCode) ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'bg-white shadow-sm text-slate-400 group-hover/item:text-indigo-400'}`}>
+                                                    <BookOpen size={18} />
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <p className="text-xs font-bold truncate">{course.name}</p>
-                                                    <p className={`text-[9px] font-black uppercase tracking-widest opacity-60`}>{course.courseCode}</p>
+                                                    <p className="text-[11px] font-black uppercase truncate tracking-tight">{course.name}</p>
+                                                    <p className={`text-[9px] font-black uppercase tracking-widest opacity-60 mt-0.5`}>{course.courseCode}</p>
                                                 </div>
                                             </button>
                                         ))}
                                     </div>
-                                    {deptCourses.length === 0 && (
-                                        <p className="text-[10px] text-amber-600 font-bold mt-1 italic px-1">⚠️ No courses available for this department.</p>
-                                    )}
                                 </div>
                             )}
 
-                            {modalMode === 'add' && (
-                                <div className="bg-indigo-600 rounded-3xl p-6 text-white relative overflow-hidden group shadow-2xl shadow-indigo-100">
-                                    <div className="relative z-10 flex items-center justify-between">
-                                        <div>
-                                            <h4 className="font-black text-lg">Auto-Account Creation</h4>
-                                            <p className="text-indigo-100 text-[10px] font-bold uppercase tracking-widest mt-1">Credentials will be generated instantly</p>
-                                        </div>
-                                        <KeyRound size={32} className="opacity-40 group-hover:rotate-12 transition-transform" />
-                                    </div>
-                                    <div className="absolute -right-4 -bottom-4 bg-white/10 w-24 h-24 rounded-full blur-2xl"></div>
-                                </div>
-                            )}
-
-                            <div className="flex gap-4 pt-4">
+                            <div className="flex gap-5 pt-6 pb-2">
                                 <button type="button" onClick={() => setIsModalOpen(false)}
-                                    className="px-8 py-4 bg-slate-50 text-slate-400 font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-slate-100 transition-colors">
-                                    Dismiss
+                                    className="px-10 py-5 bg-slate-50 text-slate-400 font-black text-[11px] uppercase tracking-[0.2em] rounded-[1.25rem] hover:bg-slate-100 hover:text-slate-600 transition-all">
+                                    Cancel
                                 </button>
                                 <button type="submit" disabled={submitting}
-                                    className="flex-1 px-8 py-4 bg-slate-900 text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 active:scale-95 disabled:opacity-50">
-                                    {submitting ? 'Processing...' : modalMode === 'add' ? 'Confirm Onboarding' : 'Sync Profile Updates'}
+                                    className="flex-1 px-10 py-5 bg-[#0F172A] text-white font-black text-[11px] uppercase tracking-[0.2em] rounded-[1.25rem] hover:bg-slate-800 transition-all shadow-2xl shadow-slate-200 active:scale-[0.98] disabled:opacity-50">
+                                    {submitting ? 'Executing Command...' : modalMode === 'add' ? 'Confirm Onboarding' : 'Sync Master Record'}
                                 </button>
                             </div>
                         </form>
